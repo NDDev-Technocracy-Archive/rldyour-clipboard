@@ -7,20 +7,22 @@ repository:
   lifecycle: active
 provider:
   type: github
-  installation: installation:github-nddev-technocracy-sandbox
-  owner: NDDev-Technocracy-Sandbox
+  installation: installation:github-nddev-technocracy-opennetwork
+  owner: NDDev-Technocracy-OpenNetwork
   repository_id: 1378441391
   name: rldyour-clipboard
+  aliases:
+  - owner: NDDev-Technocracy-Sandbox
+    name: rldyour-clipboard
 classification:
   portfolios:
-  - "portfolio:nddev-technocracy-sandbox"
+  - portfolio:nddev-technocracy-opennetwork
   visibility_contract: public
   data_classification: public
 product:
-  purpose: >-
-    Local-first clipboard archive: a Rust daemon recording clipboard history
-    with a searchable store, Python client library, and a desktop extension
-    for browsing and re-picking entries.
+  purpose: 'Local-first clipboard archive: a Rust daemon recording clipboard history
+    with a searchable store, Python client library, and a desktop extension for browsing
+    and re-picking entries.'
 policy:
   profiles:
   - repository-default
