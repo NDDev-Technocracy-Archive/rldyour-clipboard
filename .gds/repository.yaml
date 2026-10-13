@@ -4,19 +4,21 @@ repository:
   display_name: rldyour-clipboard
   roles:
   - project
-  lifecycle: active
+  lifecycle: archived
 provider:
   type: github
-  installation: installation:github-nddev-technocracy-opennetwork
-  owner: NDDev-Technocracy-OpenNetwork
+  installation: installation:github-nddev-technocracy-archive
+  owner: NDDev-Technocracy-Archive
   repository_id: 1378441391
   name: rldyour-clipboard
   aliases:
+  - owner: NDDev-Technocracy-OpenNetwork
+    name: rldyour-clipboard
   - owner: NDDev-Technocracy-Sandbox
     name: rldyour-clipboard
 classification:
   portfolios:
-  - portfolio:nddev-technocracy-opennetwork
+  - portfolio:nddev-technocracy-archive
   visibility_contract: public
   data_classification: public
 product:
