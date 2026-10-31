@@ -5,22 +5,23 @@ on:
     branches: [main]
   pull_request:
   # Advisory drift and action rot happen without pushes too.
-  schedule:
-    - cron: '0 6 * * 1'
 
 permissions:
   contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint:
     name: Lint and metadata
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: cargo fmt --check --manifest-path daemon/Cargo.toml
       - run: |
           sudo apt-get update
@@ -36,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, macos-26-intel, windows-latest]
+        os: [ubuntu-24.04, macos-26, macos-26-intel, windows-2025]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     defaults:
@@ -44,6 +45,8 @@ jobs:
         working-directory: daemon
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
@@ -68,17 +71,23 @@ jobs:
 
   msrv:
     name: Minimum Rust version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: rustup toolchain install 1.95 --profile minimal
       - run: cargo +1.95 check --locked --manifest-path daemon/Cargo.toml
 
   extension:
     name: GNOME extension
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y libglib2.0-bin gjs
@@ -96,10 +105,12 @@ jobs:
       fail-fast: false
       matrix:
         # Windows included: it is the only run that exercises uds_windows.
-        os: [ubuntu-latest, macos-latest, macos-26-intel, windows-latest]
+        os: [ubuntu-24.04, macos-26, macos-26-intel, windows-2025]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.13'
@@ -158,10 +169,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-24.04, macos-26]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.13'
@@ -179,10 +193,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, macos-26-intel]
+        os: [macos-26, macos-26-intel]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: |
           swiftc -target "$(uname -m)-apple-macosx12.0" -swift-version 6 -parse-as-library -warnings-as-errors -O -framework AppKit macos/*.swift -o /tmp/clipboard-app
           swiftc -swift-version 6 -parse-as-library -warnings-as-errors macos/Models.swift macos/tests/ModelsTests.swift -o /tmp/clipboard-model-tests
@@ -191,9 +208,39 @@ jobs:
 
   audit:
     name: Dependency advisories
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: cargo install cargo-audit --version 0.22.1 --locked
       - run: cargo audit
         working-directory: daemon
+
+  workflows:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: NDDev-Technocracy-Standarts/std-0004-ci-cd-workflows/.github/actions/tools@ab62f45b2a3067e5a7425d703f7fd07f1618b72c # nddev-cicd-v0.6.14
+        with:
+          capability: security
+      - name: Lint and audit workflows
+        run: |
+          actionlint
+          zizmor --offline --no-progress .github/workflows/ci.yml .github/dependabot.yml
+      - name: Scan new pull request commits, or the full history on main
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$BASE" ]; then
+            gitleaks git --no-banner --redact --log-opts="$BASE..$HEAD" .
+          else
+            gitleaks git --no-banner --redact .
+          fi
+
