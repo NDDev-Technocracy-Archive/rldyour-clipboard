@@ -47,14 +47,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      # Restores the latest main entry for this OS and architecture on every
+      # event; only main saves it, so pull requests never write the cache.
+      - uses: NDDev-Technocracy-Standarts/std-0004-ci-cd-workflows/.github/actions/hosted-cache@ab62f45b2a3067e5a7425d703f7fd07f1618b72c # nddev-cicd-v0.6.14
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            daemon/target
-          key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('daemon/Cargo.lock') }}
-          restore-keys: cargo-${{ runner.os }}-${{ runner.arch }}-
+          ecosystems: cargo
+          working-directory: daemon
       # The macOS and Windows capture backends cannot be cross-checked from a
       # Linux workstation: the bundled SQLite needs a C toolchain for the
       # target. These three jobs are what actually proves they compile.
@@ -118,6 +116,8 @@ jobs:
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           version: '0.12.17'
+          # Only one pinned pytest wheel is fetched; a cache would cost more than it saves.
+          enable-cache: 'false'
       - name: Record and read the isolated archive (Unix)
         if: runner.os != 'Windows'
         timeout-minutes: 5
@@ -182,6 +182,8 @@ jobs:
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           version: '0.12.17'
+          # Only one pinned pytest wheel is fetched; a cache would cost more than it saves.
+          enable-cache: 'false'
       - name: Run the test suite
         shell: bash
         run: PYTHONPATH=python/src uv run --no-project --with pytest==9.1.1 pytest python/tests
