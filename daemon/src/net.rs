@@ -170,7 +170,7 @@ fn prepare_inherited(listener: &Listener) -> io::Result<()> {
     Ok(())
 }
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -199,6 +199,7 @@ mod tests {
         let path = path();
         drop(bind_at(&path).unwrap());
         let replacement = bind_at(&path).unwrap();
+        #[cfg(unix)]
         prepare_inherited(&replacement).unwrap();
         drop(replacement);
         std::fs::remove_file(path).unwrap();
