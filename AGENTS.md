@@ -1,108 +1,67 @@
-# NDDev Clipboard — working notes
+# NDDev Clipboard
 
-The product version comes from Cargo.toml. Keep clients, changelog and
-release metadata aligned. Preserve original release identities and stored data.
-Final machine qualification belongs in a metadata receipt outside this repository.
+This is an independent public product. The daemon owns capture, the SQLite index and
+content-addressed archive. Integration consumers use the public contract and never open the
+database or start a second collector. NDS identity, replication and telemetry belong in its
+separate adapter. Keep private organization material and real clipboard data outside this
+repository, logs, screenshots and artifacts.
 
-This is an independent public product. Keep NDS identity, replica stores, admission and
-telemetry composition in its adapter. Original code uses Apache-2.0; retain third-party
-notices. Keep private organization material and real clipboard content outside source,
-logs, screenshots and artifacts. Build and test on execution hosts or CI; source-only
-checks may run on the source host.
-
-Clipboard archive: a Rust daemon owns the store; thin platform clients capture
-and restore. Linux capture is split — the daemon watches X11 itself (XFIXES),
-the GNOME Shell extension covers Wayland. macOS and Windows capture natively
-inside the daemon.
+The product version comes from the root Cargo workspace. API and SDK path requirements must
+resolve to that same version; Cargo checks them. Generate schemas and client constants from
+`crates/api` with `clipboard-tools`; do not maintain copied protocol tables. Preserve the v1
+wire format, immutable published releases and existing archive/installation identities.
 
 ## Layout
 
-| Path | What it is |
-|---|---|
-| `daemon/` | Rust daemon: `capture/` (per-OS backends: `x11.rs`, `macos.rs`, `windows.rs`), `store/` (SQLite index + content-addressed blobs + thumbnails), `config.rs`, `server.rs`, `maintenance.rs`, `net.rs`, `proto.rs`, `session.rs`, `kind.rs` (mime ranking / sensitive hints / protocol-target filtering) |
-| `daemon/src/storage_fs/` | Common absolute/regular path boundary, private file creation, POSIX no-follow/directory sync and Windows reparse/open/file-flush semantics |
-| `extension/` | GNOME Shell extension (GNOME 46–50): `lib/capture.js`, `restore.js`, `client.js`, `mimes.js`, `indicator.js` |
-| `macos/` | Native AppKit menu; typed models, bounded streaming socket client, UI; Swift 6, macOS 12+ |
-| `python/` | Dependency-free protocol client + CLI |
-| `daemon/systemd/` | `rldyour-clipboardd.{service,socket}` — socket-activated, sandboxed |
-| `daemon/launchd/` | macOS agent plist (`launch_activate_socket("sock")` contract) |
-| `scripts/` | Consistency/version checks and synthetic integration tests; platform installers live at the repository root |
+- `crates/api`: typed configuration, wire protocol, content rules and desktop presentation types.
+- `crates/sdk`: streaming client over a caller-owned connection; no archive access or collector.
+- `daemon`: native capture, serving, private filesystem operations, store and maintenance.
+- `tools/clipboard-tools`: source verifier and contract generator. Its binary checks its source
+  fingerprint before operating. Use a verified runner artifact on a source-only machine.
+- `ui`: shared history view and its isolated browser harness. The harness uses synthetic data;
+  it is not a native tray application. Public design assets are immutable inputs with a digest.
+- `extension`, `macos`, `python`: existing GNOME, AppKit and Python clients under migration.
+- `daemon/systemd`, `daemon/launchd`, root installers and legacy CI: migration remains part of
+  issue #14. Do not deploy them with the new configuration until all callers are qualified.
 
-## Verify
+## Verification
 
-```sh
-./scripts/check-version.sh
-cargo fmt --check --manifest-path daemon/Cargo.toml
-cargo test --locked --all-features --manifest-path daemon/Cargo.toml
-cargo clippy --locked --all-targets --all-features --manifest-path daemon/Cargo.toml -- -D warnings
-./scripts/check-extension.sh && gjs -m extension/tests/smoke.js
-PYTHONPATH=python/src uv run --no-project --with pytest==9.1.1 pytest python/tests
-./scripts/check-consistency.sh
-test_root=$(mktemp -d /tmp/cb.XXXX)
-export RLDYOUR_CLIPBOARD_HOME=$(python3 -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' "$test_root")
-RLDYOUR_CLIPBOARD_CAPTURE=0 ./daemon/target/debug/rldyour-clipboardd &
-./scripts/e2e-sample.py   # against the spawned daemon's socket
-```
+Build-free checks run with `just check`. Builds, tests and applications run on execution hosts
+or CI. `just build-tools` prepares the verifier there; `just generate` refreshes committed
+contracts and UI projections. `just test` and `just test-browser` belong on execution hosts.
+Keep the Windows occupied-path preservation regression enabled; its failure blocks release.
+The temporary branch workflows do not qualify installation or replace the final delivery gates.
 
-## Invariants guarded by check-consistency.sh
+The native boundary ADR is under discussion. No new native exception is approved implicitly.
+API, SDK and tooling forbid unsafe Rust. Keep legacy native code contained until the agreed
+boundary is implemented and every unsafe operation has its native qualification.
 
-Duplicated facts that must not drift: mime rank table and `SENSITIVE` hints
-(`kind.rs` ↔ `mimes.js`), `PROTOCOL_TARGETS` and `MAX_REPRESENTATIONS`,
-`PROTOCOL_VERSION` (Rust/JS/Python), `SOCKET_NAME` (code ↔ systemd unit ↔
-launchd plist), `MAX_FRAME`. If you touch one side, touch the other and rerun
-the script.
+## Data and lifecycle
 
-## Platform truths that shape the code
+- Never inspect or export a user's clipboard. Use a short private synthetic root, a complete
+  configuration file and `capture_native = false` for protocol/process fixtures. Do not restart
+  installed services or the desktop session to exercise development code.
+- A daemon acquires the archive lease before publishing its endpoint. A second profile cannot
+  open the same archive. Keep socket activation consistent with the selected configuration.
+- Never unlink a live listener, ordinary file, directory, symlink or unrelated reparse point.
+  Connection refusal alone does not classify an occupied Windows endpoint.
+- Private directories must already be private or be created privately. Never chmod an existing
+  shared directory. Archive/index/blob operations reject redirects and special files.
+- A complete TOML profile owns paths, budget, retention and native capture. Missing or invalid
+  fields fail before opening an archive. Existing archives require explicit policy at profile
+  initialization; do not infer it from legacy environment variables.
+- Favorites are the durable `pinned` flag. Expiry, budget eviction and clear preserve pins;
+  explicit remove may delete one. Keyset paging follows the archive's ordering, not just IDs.
+- Pin acknowledgement flushes content before its FULL-synchronous SQLite commit. POSIX also
+  synchronizes relevant directory entries. Windows flushes writable file handles and WAL;
+  do not claim a portable directory-fsync or a hardware power-loss guarantee.
+- Control frames are bounded and payloads are streamed through the same buffered reader.
+  An interrupted exchange must not reuse a connection with leftover payload bytes.
+- Secret/transient hints are checked at capture and again at commit. Do not log content,
+  previews, search terms, source file paths or native diagnostic payloads.
 
-- **Wayland/GNOME**: only in-shell code may read the selection; the extension
-  streams bytes out and does nothing else. `MetaSelectionSourceMemory` serves
-  exactly one mime (`g_strcmp0`), so Wayland restore is single-mime by design.
-- **X11/XRDP**: any client can watch `CLIPBOARD`; the daemon does it natively
-  (`x11rb` + XFIXES, INCR-aware, owner-change aborts the pending read at once,
-  lost X connections reconnect on a capped backoff). Restore goes through
-  `xclip` so every requested target is answered.
-- **xrdp/cliprdr**: remote copies arrive as `UTF8_STRING`/`text/uri-list`/
-  `x-special/gnome-copied-files`/`image/bmp`. Images out to RDP clients must
-  be `image/bmp` — `fetch` with `transcode:true` produces it on demand from
-  any stored `image/*` (never persisted).
-- **Secrets**: entries advertising password-manager/transient hints are
-  dropped before bytes are stored — checked at capture and again in `commit`.
-- **Favorites = `entry.pinned`**: one durable flag is the whole model. Pinned
-  rows are skipped by eviction and `clear`, so the favorites list survives
-  restarts and reboots with the archive. `list` takes `pinned: bool` to page
-  favorites alone; `stats` adds a `pinned` count. Picker tabs: Recent
-  (`pinned:false`, last 10 first) vs Favorites (`pinned:true`, PAGE-sized).
-- **Paging is keyset, not `id <`**: `before` resolves the cursor row's
-  `(pinned, at)` because the order is `pinned DESC, at DESC` — an id bound
-  drops rows at the pinned seam and past re-copied (touched) entries. A
-  removed cursor row falls back to the id approximation.
-- **Lifecycle**: socket-activated daemon stays resident while it can watch the
-  clipboard itself; it idle-exits (2 min) only when nothing is capturing.
-- `RLDYOUR_CLIPBOARD_HOME` relocates archive **and** socket together on every
-  platform; clients resolve env first, then the platform convention.
-
-## Ops
-
-- Live service: `systemctl --user status rldyour-clipboardd.{socket,service}`;
-  logs `journalctl --user -u rldyour-clipboardd.service`.
-- A self-bound daemon refuses a live listener, symlink or regular file; only
-  a dead socket is replaced. An exclusive archive lock prevents two processes
-  from sweeping or indexing the same store. Always isolate tests with a short
-  temporary `RLDYOUR_CLIPBOARD_HOME` and `RLDYOUR_CLIPBOARD_CAPTURE=0`.
-- Retention defaults to 7 days since the latest capture. Startup and 60-second
-  maintenance expire only unpinned entries, at most 4 batches of 256 per wake.
-  Pinning uses a FULL-synchronous SQLite commit; unpinning restores the age
-  policy and never refreshes the timestamp. Leases protect unfinished drafts.
-- Pin acknowledgement requires content buffers to flush first; POSIX also
-  syncs blob/fanout/archive directory entries. Missing/redirected content cannot
-  become a successful pin. Windows flushes a writable file handle and SQLite
-  WAL; do not claim a portable directory-fsync or hardware power-loss guarantee.
-- Archive root/lock/index/WAL/SHM and blob paths must not cross redirects or
-  special files. Incoming publication uses create_new and private modes, never
-  follows a redirected archive path. Same-user deliberate replacement remains
-  outside this boundary. Canonicalize only synthetic system temp roots in tests.
-- Never inspect, dump or export a user's clipboard for tests. Use synthetic
-  fixtures, including the macOS `CLIPBOARD_QA` build (which never writes the
-  system pasteboard), and restrict live checks to service/aggregate metadata.
-- Never restart the desktop session to test; the daemon side is verifiable
-  entirely through the socket and journal.
+GNOME Wayland capture requires the compositor extension; X11 capture belongs to the daemon.
+Mutter's memory selection source serves one MIME representation. Preserve the existing native
+format and restore behavior when moving clients to the common window. File references and
+copied image bytes currently have different retention semantics; changing file-content
+retention requires the product decision recorded in issue #14.

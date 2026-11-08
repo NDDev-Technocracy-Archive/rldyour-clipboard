@@ -4,6 +4,12 @@ NDDev Clipboard owns its capture backends, archive, retention, pinning and local
 It runs without an NDS account, replica or collector. The native clients and command-line
 client use the same archive interface.
 
+The Rust SDK consumes the contract types directly and streams representations through a
+caller-owned connection. It does not select a transport, start a service or provide cancellation
+for an arbitrary reader. Consumers apply their own whole-operation deadline at that connection
+boundary. Native clients resolve the selected profile through the product's Rust configuration
+reader; see [configuration](configuration.md).
+
 ## Local contract
 
 [Protocol version 1](protocol.md) is the existing supported interface. Control frames and

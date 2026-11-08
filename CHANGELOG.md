@@ -5,6 +5,10 @@
 - Publish NDDev Clipboard in OpenNetwork with the original repository and release history.
 - License original code under Apache-2.0 and retain third-party attribution.
 - Describe the standalone archive and NDS integration boundary.
+- Add complete typed TOML profiles and generated configuration/protocol/client projections.
+- Add a streaming Rust SDK, qualified against private synthetic daemon processes.
+- Develop the shared history window with public design assets, five languages, four themes,
+  search, favorites, paging and exact record keys. Native integration remains under development.
 
 All notable changes to this project are documented here. The daemon, the
 Python client and this file are released together and carry the same version.

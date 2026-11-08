@@ -16,7 +16,6 @@ use utoipa::OpenApi;
 )))]
 struct LocalContract;
 
-#[path = "../fingerprint.rs"]
 mod fingerprint;
 
 fn main() -> std::process::ExitCode {

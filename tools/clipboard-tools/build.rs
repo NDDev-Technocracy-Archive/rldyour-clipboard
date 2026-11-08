@@ -1,4 +1,4 @@
-#[path = "fingerprint.rs"]
+#[path = "src/fingerprint.rs"]
 mod fingerprint;
 
 fn main() {

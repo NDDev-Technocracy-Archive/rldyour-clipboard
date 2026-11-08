@@ -18,8 +18,8 @@ toml = "=1.2.0"
 thiserror = "=2.0.21"
 utoipa = "=6.0.0"
 sha2 = "0.11"
-nddev-clipboard-api = { path = "crates/api" }
-nddev-clipboard-sdk = { path = "crates/sdk" }
+nddev-clipboard-api = { path = "crates/api", version = "=0.2.2" }
+nddev-clipboard-sdk = { path = "crates/sdk", version = "=0.2.2" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
