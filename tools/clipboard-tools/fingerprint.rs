@@ -24,7 +24,13 @@ pub(crate) fn fingerprint(root: &Path) -> std::io::Result<String> {
         hash.update((content.len() as u64).to_le_bytes());
         hash.update(content);
     }
-    Ok(format!("{:x}", hash.finalize()))
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut text = String::with_capacity(64);
+    for byte in hash.finalize() {
+        text.push(HEX[usize::from(byte >> 4)] as char);
+        text.push(HEX[usize::from(byte & 15)] as char);
+    }
+    Ok(text)
 }
 
 fn collect(root: &Path, relative: &Path, files: &mut Vec<PathBuf>) -> std::io::Result<()> {

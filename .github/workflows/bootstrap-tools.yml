@@ -39,3 +39,7 @@ jobs:
           path: .build/source-tool/
           if-no-files-found: error
           retention-days: 7
+      - name: Qualify the configured daemon
+        run: |
+          cargo clippy --locked -p rldyour-clipboardd --all-targets --all-features -- -D warnings
+          cargo test --locked -p rldyour-clipboardd --all-features
