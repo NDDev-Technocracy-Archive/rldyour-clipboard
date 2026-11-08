@@ -63,5 +63,6 @@ boundary is implemented and every unsafe operation has its native qualification.
 GNOME Wayland capture requires the compositor extension; X11 capture belongs to the daemon.
 Mutter's memory selection source serves one MIME representation. Preserve the existing native
 format and restore behavior when moving clients to the common window. File references and
-copied image bytes currently have different retention semantics; changing file-content
-retention requires the product decision recorded in issue #14.
+copied image bytes currently have different retention semantics. Durable file content is the
+selected product behavior; its storage encoding, migration and native acceptance remain in
+issue #14. Existing reference-only records must not be presented as saved file bytes.

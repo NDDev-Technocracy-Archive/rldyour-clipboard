@@ -87,6 +87,23 @@ applications rather than treating an X11-only or another compositor's test as GN
 
 - [Mutter selection source](https://gnome.pages.gitlab.gnome.org/mutter/meta/class.SelectionSource.html)
 
+## Selected file-history behavior
+
+The selected product behavior is durable file content, within the archive's configured budget.
+New copies should retain their bytes so restoration survives moving or deleting the originals.
+A copied photo file and image pixels still restore as their respective native representations.
+The storage encoding, migration and platform implementation are not yet qualified.
+
+Publish a successful durable record only after all selected content is complete. Handle large
+files with bounded streaming, cancellation and a visible refusal when the budget cannot hold
+them. Existing OS clipboard content must remain usable if archival fails. Favorites preserve
+their archived content under the existing pin policy; they do not grant an unlimited budget.
+
+Existing reference-only records have no saved file bytes. Do not claim that deleted originals
+can be recovered, silently manufacture content or scan historical paths as an implicit backfill.
+Restoration exports must keep the immutable archive intact and retain their owned materialization
+until the native clipboard transfer finishes. No data migration or installed archive has changed.
+
 ## Product acceptance
 
 A shared Tauri history window and Rust application logic follow the existing desktop stack.
@@ -97,8 +114,8 @@ and platform capture adapters remain part of the product where required by the O
 - Text/HTML/RTF, copied image bytes and copied file lists restore into actual native applications.
 - Image content and an image copied as a file retain the right native representation.
 - Unicode/multiple files, missing or moved source paths, large content and cancellation have
-  explicit behavior. File-reference versus durable file-content retention requires a product
-  decision before changing the existing data model.
+  explicit behavior. Qualify the selected durable file-content behavior, storage encoding and
+  migration before changing the existing data model.
 - Pins, byte-exact payloads and existing archives survive restarts and upgrades. Capture runs
   once per profile, and changing client views does not start another collector.
 - Settings and schemas have one typed Rust source; clients do not parse private settings again.

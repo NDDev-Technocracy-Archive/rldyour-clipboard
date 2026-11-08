@@ -1,36 +1,61 @@
-# Native platform boundary
+# Safe native adapters and the remaining FFI boundary
 
-Status: under discussion. The initial proposal is not approved. Complete the
-[desktop investigation](../research/desktop-clipboard.md) and discuss transport, native API reuse
-and the remaining exception scope before implementation or promotion.
+Status: under discussion. Neither the initial proposal nor this narrower revision is approved.
+The current direction is safe APIs first; a crate boundary alone does not justify keeping an
+unsafe operation. The [desktop investigation](../research/desktop-clipboard.md) records the
+transport alternatives and native API candidates.
 
 Clipboard needs native clipboard notifications, platform-managed socket activation and private
 filesystem operations. These are existing product capabilities. The standalone configuration
 work also exposed a Windows defect: a refused AF_UNIX connection does not prove that an occupied
 path is a socket. The native Windows regression test demonstrated deletion of an ordinary file.
 
-Place all direct native calls in one `nddev-clipboard-platform` crate. Its public interface is
-safe Rust, using owned handles and scoped callback ownership. The API, daemon, clients' shared
-rules and build tooling forbid unsafe Rust. The platform crate must not depend on the archive,
-database, service composition or NDS. It may depend on the public product contract.
+Keeping AF_UNIX and protocol v1 is the proposed transport choice. It does not require a new
+transport protocol, a TCP service or retaining the existing application-owned callbacks.
+Transport selection and permission to introduce a native exception are separate decisions.
 
-The permitted native surface is limited to:
+## Remove avoidable unsafe operations first
 
-- Inherited systemd/launchd AF_UNIX listeners. Private file opens, directory synchronization and
-  archive locks already use safe Rust APIs and do not need an exception. Validate inherited listener type and configured local path;
-  set close-on-exec and preserve ownership on every failure.
-- Existing AppKit pasteboard reads, with autorelease-scoped borrowed bytes passed synchronously
-  to a safe recorder interface.
-- Existing Windows clipboard listener/window, format enumeration and bounded locked handles.
-  Keep callback state owned by its message thread; eliminate the existing lifetime transmute.
-- A read-only `GetFileInformationByHandleEx(FileAttributeTagInfo)` query through a non-following
-  owned file handle. A stale Windows endpoint may be removed only when its actual tag is
-  `IO_REPARSE_TAG_AF_UNIX` and a connection probe reports refusal. Ordinary files, directories,
-  symlinks and unrelated reparse points are retained.
+- Private file opens, directory synchronization and archive locks already use safe Rust APIs.
+  They are not reasons for an FFI exception.
+- Prefer a qualified safe Windows clipboard monitor and scoped format access over the current
+  application-owned window callback and lifetime transmute. The investigated `clipboard-win`
+  API is a candidate, not an adopted dependency. Check privacy markers and collect formats in
+  one clipboard transaction; preserve cancellation and shutdown ownership.
+- Use safe Foundation data access when qualifying the macOS adapter. The existing unchecked
+  NSData borrow is not included in this candidate exception. Compare the safe path's real
+  memory and latency with the baseline before proposing any separate optimization exception.
+- Linux X11 already uses a safe client API. GNOME Wayland remains a compositor adapter;
+  neither requires adding application-owned Rust unsafe for this migration.
+- The shared history window and tray follow the common desktop application stack. They do not
+  justify retaining a custom unsafe GUI callback implementation.
 
-No public unsafe function, raw pointer or borrowed native handle crosses the crate boundary.
-This decision does not permit a general FFI facility, arbitrary native execution, a second
-collector, a TCP listener or changed archive/wire formats.
+New dependencies must be selected, licensed and qualified before adoption. In particular,
+Windows private-directory ownership and access control still need qualification; do not treat
+inherited permissions on every custom path as a proved private boundary.
+
+## Candidate operations still needing a decision
+
+The remaining investigated gaps are inherited systemd/launchd listener acquisition and a
+read-only Windows file attribute tag query. First verify whether a suitable safe API covers
+each gap. If direct calls remain necessary, propose only those operations in a small
+`nddev-clipboard-platform` crate:
+
+- Validate inherited listener type and configured local path, set close-on-exec, and preserve
+  handle ownership on every failure.
+- Query `GetFileInformationByHandleEx(FileAttributeTagInfo)` through a non-following owned
+  file handle. Remove a stale Windows endpoint only after a positive
+  `IO_REPARSE_TAG_AF_UNIX` classification and a refused connection probe. Preserve ordinary
+  files, directories, symlinks, unrelated reparse points and live listeners.
+
+The proposed crate has a safe Rust interface and depends on no archive, database, service
+composition, module implementation or NDS. Raw pointers and unowned handles do not cross its
+public boundary. Scoped standard-library handle borrows retain their checked lifetimes.
+The API, SDK, ordinary daemon logic and build tooling forbid unsafe Rust.
+
+This is not permission for a general FFI facility, arbitrary native execution, another
+collector, retaining every legacy unsafe block or changing archive/wire formats. The exact
+exception remains unaccepted until its necessity, alternatives and native evidence are reviewed.
 
 Qualification must cover private file/redirect boundaries and socket ownership on every
 supported OS, ordinary-file preservation and stale/live Windows AF_UNIX endpoints, actual
