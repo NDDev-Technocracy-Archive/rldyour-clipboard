@@ -91,12 +91,26 @@ for (const language of ["ru", "en", "kk", "ar", "zh"] as const) {
       await page.getByRole("searchbox").fill("");
       await page.setViewportSize({ width: 360, height: 640 });
       await page.evaluate(() => document.fonts.ready);
-      expect(
-        await page.evaluate(() => document.documentElement.scrollWidth),
-      ).toBe(360);
       await page.screenshot({
         path: info.outputPath(`${language}-${theme}.png`),
       });
+      const layout = await page.evaluate(() => ({
+        width: document.documentElement.scrollWidth,
+        outside: [...document.querySelectorAll("body *")]
+          .map((element) => ({
+            tag: element.tagName,
+            class: element.className,
+            left: element.getBoundingClientRect().left,
+            right: element.getBoundingClientRect().right,
+          }))
+          .filter((element) => element.left < 0 || element.right > innerWidth),
+      }));
+      if (layout.width !== 360)
+        await info.attach("overflow.json", {
+          body: JSON.stringify(layout, null, 2),
+          contentType: "application/json",
+        });
+      expect(layout.width).toBe(360);
       expect(errors).toEqual([]);
     });
   }
@@ -113,6 +127,14 @@ test("empty, unavailable and keyboard navigation", async ({ page }) => {
   await page.keyboard.press("ArrowRight");
   await expect(
     page.getByRole("tab", { name: resources.ru.history, exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("End");
+  await expect(
+    page.getByRole("tab", { name: resources.ru.favorites, exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Home");
+  await expect(
+    page.getByRole("tab", { name: resources.ru.recent, exact: true }),
   ).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("main")).toHaveCount(0);

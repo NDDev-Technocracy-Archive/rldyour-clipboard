@@ -75,7 +75,10 @@ export function ClipboardWindow({
     return () => controller.abort();
   }, [source, browse]);
 
-  async function act(request: DesktopAction, message: string) {
+  async function act(
+    request: Exclude<DesktopAction, { action: "browse" }>,
+    message: string,
+  ) {
     if (busy) return;
     const controller = new AbortController();
     work.current?.abort();
@@ -83,8 +86,13 @@ export function ClipboardWindow({
     setBusy(true);
     setFailed(false);
     try {
-      await source(request, controller.signal);
+      const result = await source(request, controller.signal);
       if (controller.signal.aborted) return;
+      if (
+        result.result !==
+        (request.action === "favorite" ? "changed" : "restored")
+      )
+        throw new Error("Unexpected action response");
       setNotice(message);
       setBrowse((value) => ({ ...value }));
     } catch {
@@ -107,11 +115,9 @@ export function ClipboardWindow({
         { action: "browse", view, query, before: last.key },
         controller.signal,
       );
-      if (
-        !controller.signal.aborted &&
-        epoch === requestEpoch.current &&
-        result.result === "page"
-      ) {
+      if (result.result !== "page")
+        throw new Error("Unexpected history response");
+      if (!controller.signal.aborted && epoch === requestEpoch.current) {
         setPage((old) => ({
           ...result,
           items: [
@@ -192,9 +198,14 @@ export function ClipboardWindow({
                     ? -1
                     : 0;
               if (language === "ar") step *= -1;
-              if (step) {
+              if (step || event.key === "Home" || event.key === "End") {
                 event.preventDefault();
-                const next = (index + step + views.length) % views.length;
+                const next =
+                  event.key === "Home"
+                    ? 0
+                    : event.key === "End"
+                      ? views.length - 1
+                      : (index + step + views.length) % views.length;
                 setBrowse({ view: views[next], query });
                 tabs.current[next]?.focus();
               }
@@ -225,9 +236,16 @@ export function ClipboardWindow({
         )}
         {empty && (
           <div className="empty-state">
-            <span className="empty-symbol" aria-hidden="true">
-              {view === "favorites" ? "☆" : "⌘"}
-            </span>
+            {view === "favorites" ? (
+              <span className="empty-symbol" aria-hidden="true">
+                ☆
+              </span>
+            ) : (
+              <span
+                className="empty-symbol entry-placeholder"
+                aria-hidden="true"
+              />
+            )}
             <h2>
               {t(
                 query
@@ -254,6 +272,7 @@ export function ClipboardWindow({
         >
           {page.items.map((entry) => {
             const image = thumbnail?.(entry);
+            const captured = new Date(entry.at * 1000);
             const caption =
               entry.preview ||
               t(
@@ -299,14 +318,16 @@ export function ClipboardWindow({
                             : "text",
                         )}
                       </span>
-                      <time dateTime={new Date(entry.at * 1000).toISOString()}>
-                        {new Intl.DateTimeFormat(language, {
-                          day: "numeric",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        }).format(entry.at * 1000)}
-                      </time>
+                      {!Number.isNaN(captured.getTime()) && (
+                        <time dateTime={captured.toISOString()}>
+                          {new Intl.DateTimeFormat(language, {
+                            day: "numeric",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }).format(captured)}
+                        </time>
+                      )}
                     </span>
                   </span>
                 </button>
