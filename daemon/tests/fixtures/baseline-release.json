@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "repository": "NDDev-Technocracy-OpenNetwork/nddev-clipboard",
+  "repository_id": 1378441391,
+  "release_id": 406089086,
+  "tag": "v0.2.1",
+  "artifacts": {
+    "linux-x86_64": {
+      "asset_id": 619585947,
+      "name": "rldyour-clipboard-0.2.1-x86_64-linux.tar.gz",
+      "size": 1280403,
+      "sha256": "5b7ac20c96a4cadab6cb4a5f7cc81ed978e7a9bc6c7fedd0366c265dbd80939c",
+      "member": "./prebuilt/rldyour-clipboardd",
+      "binary": "prebuilt/rldyour-clipboardd"
+    },
+    "macos-aarch64": {
+      "asset_id": 619585949,
+      "name": "rldyour-clipboard-0.2.1-arm64-macos.zip",
+      "size": 1173550,
+      "sha256": "d5aa2c3cc0037ff3d5c889578bc0e22e897b8f8b84ca1ffc66d05b8e9f05d3e5",
+      "member": "prebuilt/rldyour-clipboardd",
+      "binary": "prebuilt/rldyour-clipboardd"
+    },
+    "macos-x86_64": {
+      "asset_id": 619585945,
+      "name": "rldyour-clipboard-0.2.1-x86_64-macos.zip",
+      "size": 1229160,
+      "sha256": "ab44efdb99a521097d69dcef1f61a29c966a3312aa764a2685af4decb68f32b5",
+      "member": "prebuilt/rldyour-clipboardd",
+      "binary": "prebuilt/rldyour-clipboardd"
+    },
+    "windows-x86_64": {
+      "asset_id": 619585942,
+      "name": "rldyour-clipboard-0.2.1-x86_64-windows.zip",
+      "size": 1148675,
+      "sha256": "124325c6c8fffb208b6cbd7f8df355cce58e872ace04c85668cc7bd7f64f1ee5",
+      "member": "rldyour-clipboardd.exe",
+      "binary": "rldyour-clipboardd.exe"
+    }
+  }
+}

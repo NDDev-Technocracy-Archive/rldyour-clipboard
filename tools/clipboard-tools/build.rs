@@ -6,13 +6,7 @@ fn main() {
     let root = std::path::PathBuf::from(manifest).join("../..");
     let fingerprint = fingerprint::fingerprint(&root, None).expect("read the tool's source inputs");
     println!("cargo:rustc-env=CLIPBOARD_TOOLS_INPUTS={fingerprint}");
-    for name in [
-        "../../Cargo.toml",
-        "../../Cargo.lock",
-        "../../rust-toolchain.toml",
-        "../../crates/api",
-        ".",
-    ] {
-        println!("cargo:rerun-if-changed={name}");
+    for name in fingerprint::INPUTS {
+        println!("cargo:rerun-if-changed=../../{name}");
     }
 }

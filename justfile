@@ -23,6 +23,7 @@ build-tools:
 
 # Execution host or runner only; the occupied-path regression stays enabled.
 test:
+    .tools/bin/clipboard-tools prepare-upgrade-fixture
     cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
     cargo nextest run --locked --workspace --all-features
     cargo test --locked --workspace --doc

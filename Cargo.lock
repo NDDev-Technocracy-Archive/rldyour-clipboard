@@ -68,6 +68,7 @@ name = "clipboard-tools"
 version = "0.2.2"
 dependencies = [
  "nddev-clipboard-api",
+ "serde",
  "serde_json",
  "sha2",
  "toml",

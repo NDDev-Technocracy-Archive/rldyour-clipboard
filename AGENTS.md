@@ -30,6 +30,10 @@ wire format, immutable published releases and existing archive/installation iden
 Build-free checks run with `just check`. Builds, tests and applications run on execution hosts
 or CI. `just build-tools` prepares the verifier there; `just generate` refreshes committed
 contracts and UI projections. `just test` and `just test-browser` belong on execution hosts.
+`just test` prepares a pinned, unmodified release fixture through GitHub CLI, verifies
+repository/release IDs, size and SHA, and qualifies archive upgrade plus return to that baseline
+with native capture disabled. The fixture lives only in `.build/`; installers never run.
+Windows native capture acceptance requires an explicitly isolated CI desktop and a process lease.
 Keep the Windows occupied-path preservation regression enabled; its failure blocks release.
 The temporary branch workflows do not qualify installation or replace the final delivery gates.
 

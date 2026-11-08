@@ -204,6 +204,66 @@ fn native_windows_observer_captures_the_first_copy_after_the_protocol_greeting()
 }
 
 #[test]
+fn published_archive_survives_upgrade_and_return_to_the_unmodified_baseline_release() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+    let target = format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH);
+    let baseline: Value =
+        serde_json::from_str(include_str!("fixtures/baseline-release.json")).unwrap();
+    let binary = baseline["artifacts"][&target]["binary"].as_str().unwrap();
+    let executable = root
+        .join(".build/upgrade-fixture")
+        .join(&target)
+        .join(binary);
+    assert!(
+        executable.is_file(),
+        "prepare the pinned baseline with clipboard-tools prepare-upgrade-fixture"
+    );
+    let fixture = Fixture::new();
+    let endpoint = fixture.0.join("rldyour-clipboard.sock");
+    let profile = fixture.profile("upgrade.toml", "", "rldyour-clipboard.sock");
+    let old_command = || {
+        let mut process = Command::new(&executable);
+        for name in ["LISTEN_FDS", "LISTEN_PID", "LISTEN_FDNAMES"] {
+            process.env_remove(name);
+        }
+        process
+            .env("RLDYOUR_CLIPBOARD_HOME", &fixture.0)
+            .env("RLDYOUR_CLIPBOARD_CAPTURE", "0")
+            .env("RLDYOUR_CLIPBOARD_BUDGET", (8 * 1024 * 1024).to_string())
+            .env("RLDYOUR_CLIPBOARD_RETENTION_DAYS", "9");
+        process
+    };
+    let original = "Published baseline: русский, қазақша, العربية, 中文, 🖇".as_bytes();
+    let (old, mut peer) = Daemon::start_command(old_command(), &endpoint);
+    let first = peer.record(original);
+    peer.request(json!({"op":"pin", "req":4, "entry":first, "pinned":true}));
+    drop(peer);
+    drop(old);
+
+    let (new, mut peer) = Daemon::start(&profile, &endpoint);
+    assert_eq!(
+        peer.request(json!({"op":"list", "req":5, "pinned":true}))["items"][0]["id"],
+        first
+    );
+    let added = format!("New version: {}", "x".repeat(3 * 1024 * 1024));
+    let second = peer.record(added.as_bytes());
+    peer.request(json!({"op":"pin", "req":6, "entry":second, "pinned":true}));
+    drop(peer);
+    drop(new);
+
+    let (_old_again, mut peer) = Daemon::start_command(old_command(), &endpoint);
+    let page = peer.request(json!({"op":"list", "req":7, "pinned":true}));
+    assert_eq!(page["items"].as_array().unwrap().len(), 2);
+    for (entry, expected) in [(first, original), (second, added.as_bytes())] {
+        let blob = peer.request(json!({"op":"fetch", "req":8, "entry":entry}));
+        assert_eq!(blob["bytes"].as_u64().unwrap(), expected.len() as u64);
+        let mut actual = vec![0; expected.len()];
+        peer.0.read_exact(&mut actual).unwrap();
+        assert_eq!(actual, expected);
+    }
+}
+
+#[test]
 fn configuration_validation_and_discovery_have_no_archive_effects() {
     let fixture = Fixture::new();
     let profile = fixture.profile("clipboard.toml", "unused", "unused.sock");

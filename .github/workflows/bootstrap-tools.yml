@@ -57,7 +57,10 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - name: Qualify the configured daemon
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          target/debug/clipboard-tools prepare-upgrade-fixture
           cargo clippy --locked -p rldyour-clipboardd --all-targets --all-features -- -D warnings
           cargo test --locked -p rldyour-clipboardd --test profile_lifecycle --all-features
           cargo test --locked -p rldyour-clipboardd --all-features

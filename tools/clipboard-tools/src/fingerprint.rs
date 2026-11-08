@@ -1,14 +1,27 @@
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
+pub(crate) const INPUTS: &[&str] = &[
+    "Cargo.toml",
+    "Cargo.lock",
+    "rust-toolchain.toml",
+    "daemon/tests/fixtures/baseline-release.json",
+    "crates/api",
+    "tools/clipboard-tools",
+];
+
 pub(crate) fn fingerprint(root: &Path, directory: Option<&Path>) -> std::io::Result<String> {
     let mut files = Vec::new();
     if let Some(directory) = directory {
         collect(root, directory, &mut files, true)?;
     } else {
-        files.extend(["Cargo.toml", "Cargo.lock", "rust-toolchain.toml"].map(PathBuf::from));
-        for directory in ["crates/api", "tools/clipboard-tools"] {
-            collect(root, &PathBuf::from(directory), &mut files, false)?;
+        for input in INPUTS {
+            let relative = PathBuf::from(input);
+            if std::fs::symlink_metadata(root.join(input))?.is_dir() {
+                collect(root, &relative, &mut files, false)?;
+            } else {
+                files.push(relative);
+            }
         }
     }
     files.sort();
