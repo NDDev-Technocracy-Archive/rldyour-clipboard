@@ -2,6 +2,7 @@ use std::{
     io,
     os::{
         fd::{AsRawFd, FromRawFd, OwnedFd},
+        unix::ffi::OsStrExt,
         unix::net::{UnixListener, UnixStream},
     },
     path::Path,
@@ -116,7 +117,11 @@ fn validate_listener(listener: UnixListener, configured: &Path) -> io::Result<Ac
             "activation descriptor is not a stream socket",
         ));
     }
-    if listener.local_addr()?.as_pathname() != Some(configured) {
+    if !listener
+        .local_addr()?
+        .as_pathname()
+        .is_some_and(|native| pathname_matches(native, configured))
+    {
         return Err(io::Error::other(
             "activation endpoint differs from configuration",
         ));
@@ -138,6 +143,19 @@ fn validate_listener(listener: UnixListener, configured: &Path) -> io::Result<Ac
         stream.set_nonblocking(false)?;
     }
     Ok(ActivatedListener { listener, pending })
+}
+
+fn pathname_matches(native: &Path, configured: &Path) -> bool {
+    // launchd binds a zero-filled sockaddr_un at its full structure size.
+    // Rust's SocketAddr can retain the padding as pathname bytes on Darwin.
+    // A filesystem socket name ends at the first C terminator; compare that
+    // exact name without resolving aliases, prefixes or filesystem redirects.
+    let bytes = native.as_os_str().as_bytes();
+    let end = bytes
+        .iter()
+        .position(|&byte| byte == 0)
+        .unwrap_or(bytes.len());
+    &bytes[..end] == configured.as_os_str().as_bytes()
 }
 
 fn socket_type(listener: &UnixListener) -> io::Result<libc::c_int> {
@@ -206,6 +224,25 @@ mod tests {
         fn drop(&mut self) {
             std::fs::remove_dir_all(&self.0).unwrap();
         }
+    }
+
+    #[test]
+    fn a_kernel_pathname_may_be_nul_padded_but_cannot_name_another_endpoint() {
+        use std::ffi::OsStr;
+        let expected = Path::new("/tmp/selected.sock");
+        assert!(pathname_matches(expected, expected));
+        assert!(pathname_matches(
+            Path::new(OsStr::from_bytes(b"/tmp/selected.sock\0\0\0")),
+            expected
+        ));
+        assert!(!pathname_matches(
+            Path::new(OsStr::from_bytes(b"/tmp/other.sock\0\0\0")),
+            expected
+        ));
+        assert!(!pathname_matches(
+            Path::new("/tmp/selected.sock-extra"),
+            expected
+        ));
     }
 
     #[test]

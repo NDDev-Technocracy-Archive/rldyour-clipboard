@@ -385,10 +385,18 @@ fn launchd_activation_serves_the_triggering_connection_without_a_second_listener
                     .args(["print", &self.target])
                     .output()
                 {
-                    eprintln!(
-                        "owned launchd fixture state: {}",
-                        String::from_utf8_lossy(&state.stdout)
-                    );
+                    let state = String::from_utf8_lossy(&state.stdout);
+                    let summary = state
+                        .lines()
+                        .map(str::trim)
+                        .filter(|line| {
+                            ["state =", "runs =", "last exit code =", "pid ="]
+                                .iter()
+                                .any(|prefix| line.starts_with(prefix))
+                        })
+                        .collect::<Vec<_>>()
+                        .join("; ");
+                    eprintln!("owned launchd fixture state: {summary}");
                 }
             }
             if self.active {
