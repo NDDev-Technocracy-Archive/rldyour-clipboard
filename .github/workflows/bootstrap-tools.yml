@@ -39,6 +39,7 @@ jobs:
           mkdir -p .build/source-tool
           cp target/debug/clipboard-tools .build/source-tool/
           cp contracts/config.schema.json .build/source-tool/
+          cp contracts/local-ipc.openapi.json .build/source-tool/
           git rev-parse HEAD > .build/source-tool/source-commit
           cd .build/source-tool
           sha256sum clipboard-tools config.schema.json source-commit > SHA256SUMS
