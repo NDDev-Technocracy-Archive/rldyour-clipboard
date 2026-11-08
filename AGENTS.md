@@ -1,6 +1,6 @@
 # NDDev Clipboard — working notes
 
-The product version comes from daemon/Cargo.toml. Keep clients, changelog and
+The product version comes from Cargo.toml. Keep clients, changelog and
 release metadata aligned. Preserve original release identities and stored data.
 Final machine qualification belongs in a metadata receipt outside this repository.
 

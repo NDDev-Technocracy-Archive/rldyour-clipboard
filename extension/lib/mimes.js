@@ -1,6 +1,5 @@
 /* rldyour-clipboard — which representations to keep and which to serve back
  * Copyright (C) 2026 NDDev OpenNetwork
- * SPDX-License-Identifier: AGPL-3.0-or-later
  *
  * Deliberately free of St, Clutter and Meta. These are the decisions worth
  * testing — what gets archived, what gets pasted — and keeping them out of the

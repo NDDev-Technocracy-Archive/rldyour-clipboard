@@ -1,6 +1,5 @@
 /* rldyour-clipboard — GNOME Shell extension
  * Copyright (C) 2026 NDDev OpenNetwork
- * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 import Meta from 'gi://Meta';

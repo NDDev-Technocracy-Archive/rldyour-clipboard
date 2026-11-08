@@ -1,6 +1,5 @@
 /* rldyour-clipboard — presentation helpers
  * Copyright (C) 2026 NDDev OpenNetwork
- * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 /** What a row shows when an entry has no text worth previewing. */

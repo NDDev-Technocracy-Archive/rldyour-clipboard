@@ -1,6 +1,5 @@
 /* rldyour-clipboard — preferences
  * Copyright (C) 2026 NDDev OpenNetwork
- * SPDX-License-Identifier: AGPL-3.0-or-later
  *
  * Runs in its own process, not the shell's. Nothing here may import St,
  * Clutter, Meta or Shell: doing so crashes the host process rather than

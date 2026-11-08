@@ -1,0 +1,8 @@
+# Values for explicit creation of a new profile. Runtime reads a complete file.
+# Initialization fills placement from chosen platform paths or explicit arguments.
+schema = 1
+archive_dir = ""
+socket_path = ""
+budget_bytes = 5368709120
+retention_days = 7
+capture_native = true

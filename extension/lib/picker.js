@@ -1,6 +1,5 @@
 /* rldyour-clipboard — the archive picker
  * Copyright (C) 2026 NDDev OpenNetwork
- * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 import Clutter from 'gi://Clutter';

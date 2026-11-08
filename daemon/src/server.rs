@@ -12,14 +12,14 @@ const SESSION_STACK: usize = 256 * 1024;
 const MAX_CONNECTIONS: usize = 32;
 pub(crate) static CONNECTED: AtomicUsize = AtomicUsize::new(0);
 
-pub fn run() -> std::io::Result<()> {
-    let config = crate::config::Config::load()?;
-    let root = &config.root;
-    let (listener, socket_activated) = crate::net::bind()?;
+pub fn run(config: nddev_clipboard_api::Config) -> std::io::Result<()> {
+    let root = config.archive_dir();
     let store = Arc::new(
-        store::Store::open_with_policy(root, config.budget, config.retention_seconds)
+        store::Store::open_with_policy(root, config.budget_bytes(), config.retention_seconds())
             .map_err(|error| std::io::Error::other(error.to_string()))?,
     );
+    // Acquire the archive lease before publishing an endpoint or starting capture.
+    let (listener, socket_activated) = crate::net::bind(config.socket_path())?;
 
     // A crash between a commit and its blob sweep leaves files nothing points
     // at. Startup is the only moment nothing else is writing, so it is the
@@ -39,16 +39,17 @@ pub fn run() -> std::io::Result<()> {
     // view of them; the extension still sees the full set). A Wayland
     // session without XWayland is the one place nothing outside the shell
     // may read the selection, so there the extension alone feeds the daemon.
-    let capturing = config.capture && capture::spawn(Arc::clone(&store), Arc::clone(&watchers));
+    let capturing =
+        config.capture_native() && capture::spawn(Arc::clone(&store), Arc::clone(&watchers));
     if capturing {
         eprintln!("rldyour-clipboardd: watching the clipboard natively");
     }
 
-    crate::maintenance::expire(&store, &watchers, config.retention_seconds);
+    crate::maintenance::expire(&store, &watchers, config.retention_seconds());
     crate::maintenance::spawn(
         Arc::clone(&store),
         Arc::clone(&watchers),
-        config.retention_seconds,
+        config.retention_seconds(),
         socket_activated && !capturing,
     );
 

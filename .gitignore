@@ -9,3 +9,6 @@ __pycache__/
 
 # Compiled schemas; the XML source is what is checked in.
 /extension/schemas/gschemas.compiled
+/target/
+/.tools/
+/.build/

@@ -1,6 +1,5 @@
 /* rldyour-clipboard — companion daemon client
  * Copyright (C) 2026 NDDev OpenNetwork
- * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 import Gio from 'gi://Gio';

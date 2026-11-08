@@ -10,64 +10,27 @@ pub use std::os::unix::net::{UnixListener as Listener, UnixStream as Stream};
 #[cfg(windows)]
 pub use uds_windows::{UnixListener as Listener, UnixStream as Stream};
 
-pub const SOCKET_NAME: &str = "rldyour-clipboard.sock";
-
-/// The socket location follows each platform's own convention and only that
-/// convention: honouring `XDG_RUNTIME_DIR` elsewhere would strand the clients,
-/// which look in the platform directory and nowhere else.
-///
-/// `RLDYOUR_CLIPBOARD_HOME` moves the socket together with the archive on
-/// every platform — the socket belongs beside the archive it serves, and an
-/// override that moved one but not the other would split a test deployment in
-/// two. A service manager's inherited socket still wins: `bind()` returns it
-/// before this is ever asked.
-pub fn socket_path() -> std::io::Result<std::path::PathBuf> {
-    if let Some(root) = std::env::var_os("RLDYOUR_CLIPBOARD_HOME") {
-        let directory = std::path::PathBuf::from(root);
-        crate::storage_fs::private_dir(&directory)?;
-        return Ok(directory.join(SOCKET_NAME));
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        let runtime = std::env::var_os("XDG_RUNTIME_DIR").ok_or_else(|| {
-            std::io::Error::other("XDG_RUNTIME_DIR is unset and no socket was inherited")
-        })?;
-        Ok(std::path::Path::new(&runtime).join(SOCKET_NAME))
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    {
-        // Everywhere else the socket sits beside the archive it serves.
-        let directory = crate::store::default_root()?;
-        crate::storage_fs::private_dir(&directory)?;
-        Ok(directory.join(SOCKET_NAME))
-    }
-}
-
-/// Uses the socket the service manager passed in, or binds one under the
-/// platform's per-user directory.
-///
-/// Returns the listener and whether the manager owns it, which decides if the
-/// daemon is allowed to exit when idle.
-pub fn bind() -> std::io::Result<(Listener, bool)> {
+/// Uses only the explicitly selected private local endpoint.
+pub fn bind(path: &std::path::Path) -> std::io::Result<(Listener, bool)> {
     if let Some(listener) = inherited_listener()? {
+        #[cfg(unix)]
+        if listener.local_addr()?.as_pathname() != Some(path) {
+            return Err(io::Error::other(
+                "activation endpoint differs from configuration",
+            ));
+        }
         return Ok((listener, true));
     }
-
-    let path = socket_path()?;
-
-    let listener = bind_at(&path)?;
-
-    // systemd already delivers the socket at 0600; a self-bound one gets the
-    // same restriction explicitly rather than whatever the umask happens to be.
-    // Only the owner may connect to a socket that reports this host's metrics.
+    let parent = path
+        .parent()
+        .ok_or_else(|| io::Error::other("socket has no parent"))?;
+    crate::storage_fs::private_dir(parent)?;
+    let listener = bind_at(path)?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
     }
-
     Ok((listener, false))
 }
 
@@ -215,7 +178,7 @@ mod tests {
     fn path() -> std::path::PathBuf {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         std::env::temp_dir().join(format!(
-            "sysinfo-{}-{}.sock",
+            "nddev-clipboard-{}-{}.sock",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ))

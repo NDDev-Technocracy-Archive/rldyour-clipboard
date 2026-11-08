@@ -1,6 +1,5 @@
 /* rldyour-clipboard — differences between the shell versions supported
  * Copyright (C) 2026 NDDev OpenNetwork
- * SPDX-License-Identifier: AGPL-3.0-or-later
  *
  * This extension declares GNOME Shell 46 through 50, and three of the APIs it
  * needs changed inside that range. Each difference is handled here, once,

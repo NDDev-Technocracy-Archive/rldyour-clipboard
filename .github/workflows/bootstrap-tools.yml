@@ -1,0 +1,41 @@
+name: Bootstrap source tooling
+
+on:
+  push:
+    branches: [task/14-standalone-product]
+
+permissions:
+  contents: read
+
+jobs:
+  source-tool:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f
+        with:
+          toolchain: '1.99.1'
+          components: rustfmt,clippy
+          cache: false
+      - name: Check the independent configuration contract
+        run: cargo test --locked -p nddev-clipboard-api
+      - name: Compile the source verifier and produce its schema
+        run: |
+          cargo clippy --locked -p nddev-clipboard-api -p clipboard-tools --all-targets -- -D warnings
+          cargo build --locked -p clipboard-tools
+          target/debug/clipboard-tools generate
+          mkdir -p .build/source-tool
+          cp target/debug/clipboard-tools .build/source-tool/
+          cp contracts/config.schema.json .build/source-tool/
+          git rev-parse HEAD > .build/source-tool/source-commit
+          cd .build/source-tool
+          sha256sum clipboard-tools config.schema.json source-commit > SHA256SUMS
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: clipboard-source-tool-${{ github.sha }}
+          path: .build/source-tool/
+          if-no-files-found: error
+          retention-days: 7
