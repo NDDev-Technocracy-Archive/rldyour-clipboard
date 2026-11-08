@@ -359,6 +359,7 @@ fn launchd_activation_serves_the_triggering_connection_without_a_second_listener
     struct Job {
         target: String,
         active: bool,
+        log: PathBuf,
     }
     impl Job {
         fn stop(&mut self) {
@@ -376,6 +377,20 @@ fn launchd_activation_serves_the_triggering_connection_without_a_second_listener
     }
     impl Drop for Job {
         fn drop(&mut self) {
+            if self.active && std::thread::panicking() {
+                if let Ok(log) = std::fs::read_to_string(&self.log) {
+                    eprintln!("owned launchd fixture stderr: {log}");
+                }
+                if let Ok(state) = Command::new("launchctl")
+                    .args(["print", &self.target])
+                    .output()
+                {
+                    eprintln!(
+                        "owned launchd fixture state: {}",
+                        String::from_utf8_lossy(&state.stdout)
+                    );
+                }
+            }
             if self.active {
                 let _ = Command::new("launchctl")
                     .args(["bootout", &self.target])
@@ -431,6 +446,7 @@ fn launchd_activation_serves_the_triggering_connection_without_a_second_listener
     let mut job = Job {
         target: format!("{domain}/{label}"),
         active: true,
+        log: fixture.0.join("activation.log"),
     };
     let deadline = Instant::now() + Duration::from_secs(10);
     let stream = loop {
