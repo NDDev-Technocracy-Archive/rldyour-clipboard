@@ -31,3 +31,7 @@ test:
 test-browser:
     cd ui && bun run build:preview
     cd ui && bun run test
+
+# Linux/macOS execution host only: builds this source and uses a private fixture.
+test-platform-client:
+    .tools/bin/clipboard-tools qualify-platform-client

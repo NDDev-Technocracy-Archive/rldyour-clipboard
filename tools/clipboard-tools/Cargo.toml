@@ -9,11 +9,13 @@ repository.workspace = true
 
 [dependencies]
 nddev-clipboard-api.workspace = true
+nddev-clipboard-sdk.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 toml.workspace = true
 sha2.workspace = true
 utoipa.workspace = true
+tempfile.workspace = true
 
 [build-dependencies]
 sha2.workspace = true

@@ -7,6 +7,7 @@ pub(crate) const INPUTS: &[&str] = &[
     "rust-toolchain.toml",
     "daemon/tests/fixtures/baseline-release.json",
     "crates/api",
+    "crates/sdk",
     "tools/clipboard-tools",
 ];
 

@@ -17,6 +17,7 @@ use utoipa::OpenApi;
 struct LocalContract;
 
 mod fingerprint;
+mod platform_client;
 mod upgrade_fixture;
 
 fn main() -> std::process::ExitCode {
@@ -47,6 +48,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         "check" => generated(&root, false),
         "generate" => generated(&root, true),
         "prepare-upgrade-fixture" => upgrade_fixture::prepare(&root),
+        "qualify-platform-client" => platform_client::qualify(&root),
         "install-tool" => {
             let directory = root.join(".tools/bin");
             std::fs::create_dir_all(&directory)?;

@@ -35,6 +35,9 @@ contracts and UI projections. `just test` and `just test-browser` belong on exec
 repository/release IDs, size and SHA, and qualifies archive upgrade plus return to that baseline
 with native capture disabled. The fixture lives only in `.build/`; installers never run.
 Windows native capture acceptance requires an explicitly isolated CI desktop and a process lease.
+`just test-platform-client` builds this source and exercises the retained GJS or Swift socket
+client on Linux/macOS. It uses a private complete profile with native capture disabled; it does
+not select an installed daemon. This qualifies client RPC, not a live GNOME Shell or native menu.
 Keep the Windows occupied-path preservation regression enabled; its failure blocks release.
 The temporary branch workflows do not qualify installation or replace the final delivery gates.
 
