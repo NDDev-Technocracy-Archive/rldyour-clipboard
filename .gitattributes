@@ -3,3 +3,4 @@
 *.ico binary
 *.icns binary
 licenses/** -text -diff
+/ui/vendor/opennetwork/** -text
