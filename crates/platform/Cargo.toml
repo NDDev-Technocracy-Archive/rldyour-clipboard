@@ -9,13 +9,13 @@ repository.workspace = true
 description = "Scoped native operations for NDDev Clipboard"
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2"
+libc.workspace = true
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_SystemServices"] }
+windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_SystemServices"] }
 
 [target.'cfg(windows)'.dev-dependencies]
-uds_windows = "1.2.1"
+uds_windows.workspace = true
 
 # The only native exception is described in docs/decisions/0001-native-boundary.md.
 # Ordinary workspace crates inherit unsafe_code = forbid.

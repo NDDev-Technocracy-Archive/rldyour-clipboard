@@ -18,7 +18,17 @@ serde_json = "=1.0.154"
 toml = "=1.2.0"
 thiserror = "=2.0.21"
 utoipa = "=6.0.0"
-sha2 = "0.11"
+sha2 = "=0.11.1"
+image = { version = "=0.25.10", default-features = false }
+libc = "=0.2.189"
+objc2 = "=0.6.5"
+objc2-app-kit = { version = "=0.3.2", default-features = false }
+objc2-foundation = { version = "=0.3.2", default-features = false }
+rusqlite = "=0.40.2"
+tempfile = "=3.27.0"
+uds_windows = "=1.2.1"
+windows-sys = "=0.61.2"
+x11rb = "=0.14.0"
 nddev-clipboard-api = { path = "crates/api", version = "=0.2.2" }
 nddev-clipboard-sdk = { path = "crates/sdk", version = "=0.2.2" }
 nddev-clipboard-platform = { path = "crates/platform", version = "=0.2.2" }
