@@ -128,7 +128,7 @@ pub(super) fn prepare(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
         }
         hash.update(&chunk[..bytes]);
     }
-    if format!("{:x}", hash.finalize()) != artifact.sha256 {
+    if !crate::fingerprint::hex(&hash.finalize()).eq_ignore_ascii_case(&artifact.sha256) {
         return Err("baseline release archive digest mismatch".into());
     }
     drop(file);
