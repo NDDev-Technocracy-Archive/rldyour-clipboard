@@ -132,6 +132,11 @@ fn validate_listener(listener: UnixListener, configured: &Path) -> io::Result<Ac
         Err(error) if error.kind() == io::ErrorKind::WouldBlock => None,
         Err(error) => return Err(error),
     };
+    // BSD may inherit the listener's nonblocking flag on the accepted stream.
+    // The daemon's framed reader relies on blocking I/O with explicit timeouts.
+    if let Some(stream) = &pending {
+        stream.set_nonblocking(false)?;
+    }
     Ok(ActivatedListener { listener, pending })
 }
 
