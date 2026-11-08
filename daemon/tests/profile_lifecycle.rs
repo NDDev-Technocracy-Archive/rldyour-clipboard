@@ -11,6 +11,9 @@ use std::time::{Duration, Instant};
 use std::os::unix::net::UnixStream as Stream;
 #[cfg(windows)]
 use uds_windows::UnixStream as Stream;
+#[cfg(windows)]
+#[path = "support/windows_clipboard.rs"]
+mod native_clipboard;
 
 struct Fixture(PathBuf);
 impl Fixture {
@@ -35,13 +38,23 @@ impl Fixture {
     }
 
     fn profile(&self, name: &str, archive: &str, endpoint: &str) -> PathBuf {
+        self.profile_capture(name, archive, endpoint, false)
+    }
+
+    fn profile_capture(
+        &self,
+        name: &str,
+        archive: &str,
+        endpoint: &str,
+        capture_native: bool,
+    ) -> PathBuf {
         let config = Config::new(FileConfig {
             schema: 1,
             archive_dir: self.0.join(archive),
             socket_path: self.0.join(endpoint),
             budget_bytes: 8 * 1024 * 1024,
             retention_days: 9,
-            capture_native: false,
+            capture_native,
         })
         .unwrap();
         let path = self.0.join(name);
@@ -138,6 +151,55 @@ impl Peer {
         self.request(json!({"op":"commit", "req":3, "draft":draft}))["entry"]
             .as_u64()
             .unwrap()
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn native_windows_observer_captures_the_first_copy_after_the_protocol_greeting() {
+    use clipboard_win::{Clipboard, options, raw};
+    use native_clipboard::{NativeClipboard, PNG};
+
+    let _clipboard_lease = NativeClipboard::new();
+    let fixture = Fixture::new();
+    let profile = fixture.profile_capture("native.toml", "native-archive", "native.sock", true);
+    let (_daemon, mut peer) = Daemon::start(&profile, &fixture.0.join("native.sock"));
+    // The greeting is the public readiness boundary. No sleep or retry of
+    // the clipboard write hides observer registration that finished too late.
+    let text = format!(
+        "synthetic first native copy:{}",
+        "x".repeat(3 * 1024 * 1024)
+    );
+    {
+        let _clipboard = Clipboard::new_attempts(10).unwrap();
+        clipboard_win::empty().unwrap();
+        raw::set_string_with(&text, options::NoClear).unwrap();
+        raw::set_without_clear(raw::register_format("PNG").unwrap().get(), PNG).unwrap();
+    }
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let entry = loop {
+        let page = peer.request(json!({"op":"list", "req":1}));
+        if let Some(entry) = page["items"].as_array().unwrap().iter().find(|entry| {
+            entry["mimes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|mime| mime == "image/png")
+        }) {
+            break entry["id"].as_i64().unwrap();
+        }
+        assert!(Instant::now() < deadline, "the first native copy was lost");
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    for (mime, expected) in [
+        ("text/plain;charset=utf-8", text.as_bytes()),
+        ("image/png", PNG),
+    ] {
+        let blob = peer.request(json!({"op":"fetch", "req":2, "entry":entry, "mime":mime}));
+        assert_eq!(blob["bytes"].as_u64().unwrap(), expected.len() as u64);
+        let mut actual = vec![0; expected.len()];
+        peer.0.read_exact(&mut actual).unwrap();
+        assert_eq!(actual, expected);
     }
 }
 

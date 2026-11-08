@@ -11,7 +11,7 @@
 //! and the representations are pulled out of the selection only then. Between
 //! copies this thread sits in `wait_for_event` and costs nothing.
 
-use super::Recorder;
+use super::{Recorder, Startup};
 use crate::kind;
 use std::time::{Duration, Instant};
 use x11rb::connection::Connection;
@@ -46,11 +46,15 @@ const RECONNECT_MIN: Duration = Duration::from_secs(1);
 const RECONNECT_MAX: Duration = Duration::from_secs(60);
 
 /// Watches `CLIPBOARD`, reconnecting when the X connection drops.
-pub fn watch(recorder: &Recorder) {
+pub(super) fn watch(recorder: &Recorder, startup: Startup) {
+    let mut startup = Some(startup);
     let mut backoff = RECONNECT_MIN;
     loop {
-        match run(recorder) {
+        match run(recorder, &mut startup) {
             Err(error) => {
+                if startup.as_ref().is_some_and(Startup::cancelled) {
+                    return;
+                }
                 eprintln!(
                     "rldyour-clipboardd: x11 clipboard watch stopped: {error}; \
                      retrying in {}s",
@@ -66,7 +70,10 @@ pub fn watch(recorder: &Recorder) {
     }
 }
 
-fn run(recorder: &Recorder) -> Result<(), Box<dyn std::error::Error>> {
+fn run(
+    recorder: &Recorder,
+    startup: &mut Option<Startup>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let (connection, screen_number) = RustConnection::connect(None)?;
     let screen = &connection.setup().roots[screen_number];
     let root = screen.root;
@@ -101,6 +108,11 @@ fn run(recorder: &Recorder) -> Result<(), Box<dyn std::error::Error>> {
         SelectionEventMask::SET_SELECTION_OWNER,
     )?;
     connection.flush()?;
+    if let Some(startup) = startup.take()
+        && !startup.complete()
+    {
+        return Ok(());
+    }
     eprintln!("rldyour-clipboardd: watching CLIPBOARD on the X11 server");
 
     // Read once at startup: whatever is already on the clipboard is a real

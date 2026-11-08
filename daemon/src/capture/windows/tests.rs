@@ -6,21 +6,9 @@ use std::io::Read;
 use std::sync::{Arc, mpsc};
 use std::time::{Duration, Instant};
 
-// A generated 1x1 RGBA PNG with pixel (0x12, 0x34, 0x56, 0xff).
-const PNG: &[u8] = &[
-    137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0,
-    0, 0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68, 65, 84, 120, 156, 99, 16, 50, 9, 251, 15, 0, 2,
-    148, 1, 156, 29, 91, 70, 95, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
-];
-
-struct SyntheticClipboard;
-impl Drop for SyntheticClipboard {
-    fn drop(&mut self) {
-        if let Ok(_clipboard) = Clipboard::new_attempts(10) {
-            let _ = clipboard_win::empty();
-        }
-    }
-}
+#[path = "../../../tests/support/windows_clipboard.rs"]
+mod fixture;
+use fixture::{NativeClipboard, PNG};
 
 fn set_text(text: &str) {
     let _clipboard = Clipboard::new_attempts(10).unwrap();
@@ -38,7 +26,7 @@ fn content(store: &Store, entry: i64, mime: &str) -> Vec<u8> {
 
 #[test]
 fn native_monitor_archives_multiformat_bytes_and_privacy_flags_exclude_whole_copies() {
-    let _cleanup = SyntheticClipboard;
+    let _cleanup = NativeClipboard::new();
     // Before monitor registration, replace only this isolated CI desktop's
     // clipboard. Never read any pre-existing content even in the fixture.
     set_text("synthetic startup marker");

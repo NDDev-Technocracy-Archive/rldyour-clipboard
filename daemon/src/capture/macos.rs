@@ -9,7 +9,7 @@
 
 mod data_reader;
 
-use super::Recorder;
+use super::{Recorder, Startup};
 use data_reader::DataReader;
 use objc2::rc::Retained;
 use objc2::rc::autoreleasepool;
@@ -41,11 +41,14 @@ const TYPES: &[(&str, &str)] = &[
 
 /// Observe new copies. The shared privacy policy is checked before native
 /// payload reads and again when the archive commits the event.
-pub fn watch(recorder: &Recorder) {
+pub(super) fn watch(recorder: &Recorder, startup: Startup) {
     let pasteboard = NSPasteboard::generalPasteboard();
     // Start from whatever is already there rather than archiving the contents
     // of the clipboard as though it had just been copied.
     let mut seen = pasteboard.changeCount();
+    if !startup.complete() {
+        return;
+    }
 
     loop {
         std::thread::sleep(POLL);

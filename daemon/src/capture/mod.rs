@@ -18,6 +18,9 @@ use crate::proto::Response;
 use crate::session::now;
 use crate::store::{Accepted, Store};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{self, SyncSender};
+use std::time::Duration;
 
 #[cfg(target_os = "macos")]
 mod macos;
@@ -39,18 +42,47 @@ pub fn spawn(store: Arc<Store>, watchers: Arc<Watchers>) -> bool {
         return false;
     }
 
+    // Rendezvous: a successful send means startup received the handoff. A
+    // queued success could race a timeout and leave a late observer running.
+    let (sender, ready) = mpsc::sync_channel(0);
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let startup = Startup {
+        sender,
+        cancelled: Arc::clone(&cancelled),
+    };
     let spawned = std::thread::Builder::new()
         .name("clipboard".into())
         .spawn(move || {
             let recorder = Recorder { store, watchers };
-            watch(&recorder);
+            watch(&recorder, startup);
         });
 
     if spawned.is_err() {
         eprintln!("rldyour-clipboardd: could not start the clipboard watcher");
         return false;
     }
+    // A thread existing is not a ready native observer. Do not serve the
+    // first client until notification registration / initial changeCount has
+    // completed, or a copy immediately after the greeting can be lost.
+    if ready.recv_timeout(Duration::from_secs(5)).is_err() {
+        cancelled.store(true, Ordering::Release);
+        eprintln!("rldyour-clipboardd: native clipboard observer did not become ready");
+        return false;
+    }
     true
+}
+
+struct Startup {
+    sender: SyncSender<()>,
+    cancelled: Arc<AtomicBool>,
+}
+impl Startup {
+    fn cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::Acquire)
+    }
+    fn complete(self) -> bool {
+        !self.cancelled() && self.sender.send(()).is_ok()
+    }
 }
 
 /// The backend the platform provides.
@@ -59,23 +91,23 @@ pub fn spawn(store: Arc<Store>, watchers: Arc<Watchers>) -> bool {
 /// a copy seen by both is one event to the archive, which the store's
 /// content deduplication absorbs.
 #[cfg(target_os = "linux")]
-fn watch(recorder: &Recorder) {
-    x11::watch(recorder);
+fn watch(recorder: &Recorder, startup: Startup) {
+    x11::watch(recorder, startup);
 }
 
 #[cfg(target_os = "macos")]
-fn watch(recorder: &Recorder) {
-    macos::watch(recorder);
+fn watch(recorder: &Recorder, startup: Startup) {
+    macos::watch(recorder, startup);
 }
 
 #[cfg(target_os = "windows")]
-fn watch(recorder: &Recorder) {
-    windows::watch(recorder);
+fn watch(recorder: &Recorder, startup: Startup) {
+    windows::watch(recorder, startup);
 }
 
 /// Platforms with no display protocol the daemon can read directly.
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
-fn watch(_: &Recorder) {}
+fn watch(_: &Recorder, _: Startup) {}
 
 /// What a platform watcher hands one clipboard event to.
 ///

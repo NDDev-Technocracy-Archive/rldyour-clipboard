@@ -6,7 +6,7 @@ mod formats;
 #[cfg(test)]
 mod tests;
 
-use super::Recorder;
+use super::{Recorder, Startup};
 use clipboard_win::{Clipboard, Getter, Monitor, formats as native, raw};
 use formats::{BMP_PREFIX, file_uris, finish_bmp, strip_cf_html, utf16_to_utf8};
 
@@ -38,7 +38,7 @@ impl Formats {
     }
 }
 
-pub fn watch(recorder: &Recorder) {
+pub(super) fn watch(recorder: &Recorder, startup: Startup) {
     let Some(formats) = Formats::new() else {
         eprintln!("rldyour-clipboardd: native privacy formats could not be registered");
         return;
@@ -47,6 +47,9 @@ pub fn watch(recorder: &Recorder) {
         eprintln!("rldyour-clipboardd: clipboard notification registration failed");
         return;
     };
+    if !startup.complete() {
+        return;
+    }
     if receive(recorder, &formats, &mut monitor).is_err() {
         eprintln!("rldyour-clipboardd: clipboard notification loop failed");
     }
