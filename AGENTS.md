@@ -15,6 +15,7 @@ wire format, immutable published releases and existing archive/installation iden
 
 - `crates/api`: typed configuration, wire protocol, content rules and desktop presentation types.
 - `crates/sdk`: streaming client over a caller-owned connection; no archive access or collector.
+- `crates/platform`: only the native operations approved in ADR 0001, behind safe interfaces.
 - `daemon`: native capture, serving, private filesystem operations, store and maintenance.
 - `tools/clipboard-tools`: source verifier and contract generator. Its binary checks its source
   fingerprint before operating. Use a verified runner artifact on a source-only machine.
@@ -34,8 +35,9 @@ The temporary branch workflows do not qualify installation or replace the final 
 
 ADR 0001 permits only the small native boundary for service-manager listener acquisition and
 the Windows endpoint tag query. It does not retain the legacy unsafe capture implementation.
-API, SDK and tooling forbid unsafe Rust. Move ordinary daemon logic to that same restriction
-as the native adapters finish migration. Every direct operation needs native qualification.
+API, SDK, ordinary daemon logic and tooling forbid unsafe Rust. Windows clipboard access
+uses the safe library and the exact BSL dependency scope approved in ADR 0002. Every direct
+operation and native adapter needs native qualification.
 
 ## Data and lifecycle
 

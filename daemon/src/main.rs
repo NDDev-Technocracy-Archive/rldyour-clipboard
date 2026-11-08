@@ -1,6 +1,7 @@
 //! Rust clipboard archive: thin CLI entry point, bounded sessions, native
 //! capture, transactional index and leased content-addressed blobs.
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+#![forbid(unsafe_code)]
 mod capture;
 mod cli;
 mod config;

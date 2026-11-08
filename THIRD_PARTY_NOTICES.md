@@ -12,7 +12,8 @@ The daemon links the following crates. Each is used under its own licence.
 | `image` | MIT or Apache-2.0 | Thumbnails, and `image/bmp` re-encoding for remote desktops. Optional: `--no-default-features` removes it. |
 | `x11rb` | MIT or Apache-2.0 | X11 protocol bindings — the daemon watches `CLIPBOARD` itself on X11/XRDP sessions. Linux only. |
 | `objc2`, `objc2-foundation`, `objc2-app-kit` | MIT | `NSPasteboard` access on macOS. |
-| `windows-sys` | MIT or Apache-2.0 | Clipboard listener and global memory on Windows. |
+| `windows-sys` | MIT or Apache-2.0 | Windows filesystem flags and the scoped endpoint tag query. |
+| `clipboard-win` 5.4.3, `error-code` 3.4.0, `windows-win` 3.0.0 | BSL-1.0 | Safe Windows clipboard guard, formats and event-driven monitor. The accepted scope is ADR 0002; applicable upstream license text is in `licenses/BSL-1.0.txt`. Upstream author: Douman (<https://github.com/DoumanAsh>). |
 | `uds_windows` | MIT | AF_UNIX sockets on Windows, which the standard library does not expose. |
 
 The Python client depends on nothing outside the standard library.

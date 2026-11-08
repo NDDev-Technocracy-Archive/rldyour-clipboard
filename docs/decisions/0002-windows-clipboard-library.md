@@ -1,6 +1,7 @@
 # Safe Windows clipboard access and its dependency license
 
-Status: proposed, awaiting owner discussion and approval.
+Status: accepted, 2026-11-08. After native qualification and license review,
+the owner approved the library and its limited BSL-1.0 dependency scope.
 
 ## Problem and recommendation
 
@@ -32,10 +33,10 @@ require disclosing product source or our changes. Our original code remains
 Apache-2.0. Preserve the dependency license texts and notices in distributions
 even where the binary exception applies.
 
-Approval would permit these three pinned BSL-1.0 dependencies only, not an
+Approval permits these three pinned BSL-1.0 dependencies only, not an
 unrestricted license allowlist. Add the qualified technology lines through the
-dependency-governance process before product promotion. Do not merge, release
-or add these dependencies to the product workspace while this ADR is proposed.
+dependency-governance process before product promotion. Product acceptance and
+the corresponding dependency checks remain release requirements.
 
 ## Alternatives considered
 

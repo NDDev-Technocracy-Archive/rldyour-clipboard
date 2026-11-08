@@ -29,6 +29,7 @@ tempfile = "=3.27.0"
 uds_windows = "=1.2.1"
 windows-sys = "=0.61.2"
 x11rb = "=0.14.0"
+clipboard-win = { version = "=5.4.3", features = ["std", "monitor"] }
 nddev-clipboard-api = { path = "crates/api", version = "=0.2.2" }
 nddev-clipboard-sdk = { path = "crates/sdk", version = "=0.2.2" }
 nddev-clipboard-platform = { path = "crates/platform", version = "=0.2.2" }

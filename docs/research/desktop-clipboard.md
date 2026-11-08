@@ -67,7 +67,8 @@ copies. Inspection used commit `ed27008ae5d1f10cfbb266de039f0fb35fd05a56`, publi
 under BSL-1.0. The isolated console/Windows-subsystem probe now passes native
 notification, one locked multi-format read, Unicode file-list and shutdown cases;
 [ADR 0002](../decisions/0002-windows-clipboard-library.md) proposes its adoption
-and reviews all three resolved BSL-1.0 packages. Product adoption remains pending.
+and reviews all three resolved BSL-1.0 packages. The owner approved that exact
+library/license scope on 2026-11-08. The production adapter is now being qualified.
 
 - [Monitor and shutdown](https://docs.rs/clipboard-win/latest/clipboard_win/monitor/struct.Monitor.html)
 - [Formats and file-list setters](https://github.com/DoumanAsh/clipboard-win/blob/ed27008ae5d1f10cfbb266de039f0fb35fd05a56/src/formats.rs)
@@ -85,8 +86,19 @@ The previous macOS path borrowed NSData through an unchecked application call.
 The candidate replaces it with an immutable Foundation snapshot and safe bounded
 range copies into the archive writer. `NSData::to_vec` on the entire object would
 allocate a full Rust payload; `NSData::iter` also makes that copy internally.
-Native byte-accuracy and one-shot 128 MiB resource evidence qualify the safe range
-reader. Resource results are still pending; no efficiency improvement is assumed.
+Native byte-accuracy, privacy exclusions and one-shot 128 MiB resource evidence
+passed on both architectures in [run 42487506891](https://github.com/NDDev-Technocracy-OpenNetwork/nddev-clipboard/actions/runs/42487506891).
+The measured reader also hashes every byte and checks it against the fixture.
+
+| macOS architecture | Safe range reader peak RSS | Safe whole-copy peak RSS | Range / whole-copy elapsed |
+| --- | --- | --- | --- |
+| ARM64 | 140,427,264 bytes | 274,546,688 bytes | 74,480 / 77,294 microseconds |
+| Intel | 136,454,144 bytes | 270,585,856 bytes | 662,362 / 694,121 microseconds |
+
+These are one-shot immutable NSData reader measurements, not tray-process RSS,
+continuous capture throughput or a comparison against the removed unchecked
+borrow. The range path avoids a second whole Rust payload allocation while
+keeping application Rust safe. Fixture size and byte checks are identical.
 
 GNOME selection access remains a compositor integration. Mutter exposes selection source MIME
 lists and asynchronous reads. Qualify against the supported shell versions and native clipboard

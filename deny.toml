@@ -7,6 +7,22 @@ ignore = []
 [licenses]
 allow = ["Apache-2.0", "MIT", "Unicode-3.0", "Zlib"]
 
+# ADR 0002 approves exactly this resolved native dependency set.
+[[licenses.exceptions]]
+name = "clipboard-win"
+version = "=5.4.3"
+allow = ["BSL-1.0"]
+
+[[licenses.exceptions]]
+name = "error-code"
+version = "=3.4.0"
+allow = ["BSL-1.0"]
+
+[[licenses.exceptions]]
+name = "windows-win"
+version = "=3.0.0"
+allow = ["BSL-1.0"]
+
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
