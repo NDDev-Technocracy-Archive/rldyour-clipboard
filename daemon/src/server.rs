@@ -19,7 +19,11 @@ pub fn run(config: nddev_clipboard_api::Config) -> std::io::Result<()> {
             .map_err(|error| std::io::Error::other(error.to_string()))?,
     );
     // Acquire the archive lease before publishing an endpoint or starting capture.
-    let (listener, socket_activated) = crate::net::bind(config.socket_path())?;
+    let crate::net::BoundListener {
+        listener,
+        activated: socket_activated,
+        pending,
+    } = crate::net::bind(config.socket_path())?;
 
     // A crash between a commit and its blob sweep leaves files nothing points
     // at. Startup is the only moment nothing else is writing, so it is the
@@ -53,7 +57,7 @@ pub fn run(config: nddev_clipboard_api::Config) -> std::io::Result<()> {
         socket_activated && !capturing,
     );
 
-    for stream in listener.incoming() {
+    for stream in pending.into_iter().map(Ok).chain(listener.incoming()) {
         let stream = match stream {
             Ok(stream) => stream,
             // One refused connection is not a reason to stop serving the rest.

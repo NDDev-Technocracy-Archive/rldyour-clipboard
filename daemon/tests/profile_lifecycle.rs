@@ -69,14 +69,13 @@ fn run(args: &[&std::ffi::OsStr]) -> Output {
 struct Daemon(Child);
 impl Daemon {
     fn start(profile: &Path, endpoint: &Path) -> (Self, Peer) {
-        let mut daemon = Self(
-            command()
-                .arg("--config")
-                .arg(profile)
-                .stdout(Stdio::null())
-                .spawn()
-                .unwrap(),
-        );
+        let mut process = command();
+        process.arg("--config").arg(profile);
+        Self::start_command(process, endpoint)
+    }
+
+    fn start_command(mut process: Command, endpoint: &Path) -> (Self, Peer) {
+        let mut daemon = Self(process.stdout(Stdio::null()).spawn().unwrap());
         let deadline = Instant::now() + Duration::from_secs(10);
         loop {
             if let Ok(stream) = Stream::connect(endpoint) {
@@ -316,4 +315,144 @@ fn the_rust_sdk_streams_real_multiformat_entries_and_recovers_from_a_refused_req
     let discarded = client.begin(None).unwrap();
     client.abort(discarded).unwrap();
     assert_eq!(client.list(10, None, None, None).unwrap().items.len(), 1);
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn systemd_activation_serves_the_triggering_connection_without_a_second_listener() {
+    let fixture = Fixture::new();
+    let profile = fixture.profile("clipboard.toml", "archive", "systemd.sock");
+    let endpoint = fixture.0.join("systemd.sock");
+    let mut process = Command::new("systemd-socket-activate");
+    process
+        .arg("--listen")
+        .arg(&endpoint)
+        .arg(env!("CARGO_BIN_EXE_rldyour-clipboardd"))
+        .arg("--config")
+        .arg(&profile);
+    for name in ["LISTEN_FDS", "LISTEN_PID", "LISTEN_FDNAMES"] {
+        process.env_remove(name);
+    }
+    let (_daemon, mut peer) = Daemon::start_command(process, &endpoint);
+    let entry = peer.record(b"systemd activation fixture");
+    assert_eq!(
+        peer.request(json!({"op":"pin", "req":4, "entry":entry, "pinned":true}))["ev"],
+        "ok"
+    );
+    assert_eq!(
+        peer.request(json!({"op":"list", "req":5, "pinned":true}))["items"][0]["id"],
+        entry
+    );
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn launchd_activation_serves_the_triggering_connection_without_a_second_listener() {
+    fn xml(value: &str) -> String {
+        value
+            .replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+            .replace('"', "&quot;")
+            .replace('\'', "&apos;")
+    }
+    struct Job {
+        target: String,
+        active: bool,
+    }
+    impl Job {
+        fn stop(&mut self) {
+            let result = Command::new("launchctl")
+                .args(["bootout", &self.target])
+                .output()
+                .unwrap();
+            assert!(
+                result.status.success(),
+                "launchd fixture cleanup failed: {}",
+                String::from_utf8_lossy(&result.stderr)
+            );
+            self.active = false;
+        }
+    }
+    impl Drop for Job {
+        fn drop(&mut self) {
+            if self.active {
+                let _ = Command::new("launchctl")
+                    .args(["bootout", &self.target])
+                    .output();
+            }
+        }
+    }
+    let fixture = Fixture::new();
+    let profile = fixture.profile("clipboard.toml", "archive", "launchd.sock");
+    let endpoint = fixture.0.join("launchd.sock");
+    let identity = Command::new("id").arg("-u").output().unwrap();
+    assert!(identity.status.success());
+    let uid: u32 = String::from_utf8(identity.stdout)
+        .unwrap()
+        .trim()
+        .parse()
+        .unwrap();
+    let domain = format!("user/{uid}");
+    let label = format!("ai.nddev.clipboard.fixture.{}", std::process::id());
+    let plist = fixture.0.join("activation.plist");
+    let content = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>{label}</string>
+<key>ProgramArguments</key><array><string>{binary}</string><string>--config</string><string>{profile}</string></array>
+<key>StandardErrorPath</key><string>{log}</string>
+<key>Sockets</key><dict><key>sock</key><dict><key>SockFamily</key><string>Unix</string><key>SockType</key><string>stream</string><key>SockPassive</key><true/><key>SockPathName</key><string>{endpoint}</string><key>SockPathMode</key><integer>384</integer></dict></dict>
+</dict></plist>"#,
+        binary = xml(env!("CARGO_BIN_EXE_rldyour-clipboardd")),
+        profile = xml(profile.to_str().unwrap()),
+        log = xml(fixture.0.join("activation.log").to_str().unwrap()),
+        endpoint = xml(endpoint.to_str().unwrap())
+    );
+    std::fs::write(&plist, content).unwrap();
+    let checked = Command::new("plutil")
+        .arg("-lint")
+        .arg(&plist)
+        .output()
+        .unwrap();
+    assert!(checked.status.success(), "invalid launchd fixture");
+    let loaded = Command::new("launchctl")
+        .arg("bootstrap")
+        .arg(&domain)
+        .arg(&plist)
+        .output()
+        .unwrap();
+    assert!(
+        loaded.status.success(),
+        "launchd fixture bootstrap failed: {}",
+        String::from_utf8_lossy(&loaded.stderr)
+    );
+    let mut job = Job {
+        target: format!("{domain}/{label}"),
+        active: true,
+    };
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let stream = loop {
+        if let Ok(stream) = Stream::connect(&endpoint) {
+            break stream;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "launchd did not publish the fixture endpoint"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    let mut peer = Peer::new(stream);
+    let entry = peer.record(b"launchd activation fixture");
+    assert_eq!(
+        peer.request(json!({"op":"pin", "req":4, "entry":entry, "pinned":true}))["ev"],
+        "ok"
+    );
+    assert_eq!(
+        peer.request(json!({"op":"list", "req":5, "pinned":true}))["items"][0]["id"],
+        entry
+    );
+    drop(peer);
+    job.stop();
 }
