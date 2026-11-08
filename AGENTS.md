@@ -14,7 +14,8 @@ wire format, immutable published releases and existing archive/installation iden
 ## Layout
 
 - `crates/api`: typed configuration, wire protocol, content rules and desktop presentation types.
-- `crates/sdk`: streaming client over a caller-owned connection; no archive access or collector.
+- `crates/sdk`: streaming client with an owned-transport API and a bounded native pathname connector;
+  no archive access or collector.
 - `crates/platform`: only the native operations approved in ADR 0001, behind safe interfaces.
 - `daemon`: native capture, serving, private filesystem operations, store and maintenance.
 - `tools/clipboard-tools`: source verifier and contract generator. Its binary checks its source

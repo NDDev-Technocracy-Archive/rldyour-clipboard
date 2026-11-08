@@ -371,20 +371,15 @@ fn one_archive_owner_preserves_pins_and_bytes_through_an_abrupt_restart() {
 #[test]
 fn the_rust_sdk_streams_real_multiformat_entries_and_recovers_from_a_refused_request() {
     use nddev_clipboard_api::wire::Role;
-    use nddev_clipboard_sdk::{Client, Error};
+    use nddev_clipboard_sdk::{Error, LocalOperation};
 
     let fixture = Fixture::new();
     let profile = fixture.profile("clipboard.toml", "archive", "sdk.sock");
     let endpoint = fixture.0.join("sdk.sock");
     let (_daemon, _peer) = Daemon::start(&profile, &endpoint);
-    let stream = Stream::connect(endpoint).unwrap();
-    stream
-        .set_read_timeout(Some(Duration::from_secs(5)))
-        .unwrap();
-    stream
-        .set_write_timeout(Some(Duration::from_secs(5)))
-        .unwrap();
-    let mut client = Client::new(stream, Role::Both).unwrap();
+    let operation = LocalOperation::new(Instant::now() + Duration::from_secs(15));
+    let cancellation = operation.cancellation();
+    let mut client = operation.connect(&endpoint, Role::Both).unwrap();
     assert!(client.list(10, None, None, None).unwrap().items.is_empty());
 
     let payload: Vec<u8> = (0..=255).cycle().take(3 * 1024 * 1024).collect();
@@ -437,6 +432,27 @@ fn the_rust_sdk_streams_real_multiformat_entries_and_recovers_from_a_refused_req
     let discarded = client.begin(None).unwrap();
     client.abort(discarded).unwrap();
     assert_eq!(client.list(10, None, None, None).unwrap().items.len(), 1);
+
+    let abandoned = client.begin(None).unwrap();
+    cancellation.cancel();
+    assert!(matches!(
+        client.commit(abandoned),
+        Err(Error::Transport(std::io::ErrorKind::ConnectionAborted))
+    ));
+    assert!(matches!(
+        client.list(10, None, None, None),
+        Err(Error::Closed)
+    ));
+    drop(client);
+    let mut replacement = LocalOperation::new(Instant::now() + Duration::from_secs(5))
+        .connect(&endpoint, Role::Both)
+        .unwrap();
+    // An older cancellation owner cannot shut down a replacement connection.
+    cancellation.cancel();
+    assert_eq!(
+        replacement.list(10, None, None, None).unwrap().items.len(),
+        1
+    );
 }
 
 #[cfg(target_os = "linux")]

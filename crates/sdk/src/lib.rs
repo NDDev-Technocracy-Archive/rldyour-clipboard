@@ -1,12 +1,20 @@
 //! Streaming client for the existing local protocol, with no archive access.
 //!
-//! The caller supplies an owned, connected transport with its operation deadline
-//! and cancellation policy. This crate neither connects nor starts a collector.
+//! Callers can supply an owned transport, or use [`LocalOperation`] on native
+//! platforms for a pathname socket with one absolute deadline and cancellation.
+//! This crate never starts a collector.
 //! Control frames are bounded; representation bytes use fixed-size buffers.
 //! Interrupted or malformed exchanges invalidate the connection so leftover
 //! payload bytes can never be interpreted as another response.
 use nddev_clipboard_api::wire::{MAX_FRAME, PROTOCOL_VERSION, Request, Response, Role, Summary};
 use std::io::{self, BufRead, BufReader, Read, Write};
+use std::sync::Arc;
+
+#[cfg(any(unix, windows))]
+mod local;
+mod policy;
+#[cfg(any(unix, windows))]
+pub use local::{Cancellation, LocalOperation, LocalTransport};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -40,16 +48,26 @@ pub struct Client<T> {
     stream: BufReader<T>,
     next_request: u64,
     usable: bool,
+    policy: Option<Arc<policy::Policy>>,
 }
 
 impl<T: Read + Write> Client<T> {
     /// Negotiate v1 without asynchronous broadcasts. One owner serializes calls
     /// on this connection; other clients may still update the same archive.
     pub fn new(transport: T, role: Role) -> Result<Self, Error> {
+        Self::with_policy(transport, role, None)
+    }
+
+    fn with_policy(
+        transport: T,
+        role: Role,
+        policy: Option<Arc<policy::Policy>>,
+    ) -> Result<Self, Error> {
         let mut client = Self {
             stream: BufReader::with_capacity(8192, transport),
             next_request: 1,
             usable: true,
+            policy,
         };
         client.send(&Request::Hello {
             v: PROTOCOL_VERSION,
@@ -126,7 +144,7 @@ impl<T: Read + Write> Client<T> {
             mime: mime.to_owned(),
             bytes: Some(bytes),
         })?;
-        let result = io::copy(&mut input.take(bytes), self.stream.get_mut())
+        let result = policy::copy(input, self.stream.get_mut(), bytes, self.policy.as_deref())
             .and_then(|count| self.stream.get_mut().flush().map(|()| count));
         match result {
             Ok(count) if count == bytes => self.expect_ok(req),
@@ -173,7 +191,7 @@ impl<T: Read + Write> Client<T> {
         }
         // Read through the same buffer as the control frame: it can already
         // contain the beginning of the representation or the next response.
-        match io::copy(&mut self.stream.by_ref().take(bytes), output) {
+        match policy::copy(&mut self.stream, output, bytes, self.policy.as_deref()) {
             Ok(count) if count == bytes => Ok(BlobInfo { mime, bytes }),
             Ok(_) => self.invalidate(Error::TruncatedPayload),
             Err(error) => self.invalidate(Error::Transport(error.kind())),
@@ -181,18 +199,14 @@ impl<T: Read + Write> Client<T> {
     }
 
     fn request_id(&mut self) -> Result<u64, Error> {
-        if !self.usable {
-            return Err(Error::Closed);
-        }
+        self.check()?;
         let req = self.next_request;
         self.next_request = req.checked_add(1).ok_or(Error::Closed)?;
         Ok(req)
     }
 
     fn send(&mut self, request: &Request) -> Result<(), Error> {
-        if !self.usable {
-            return Err(Error::Closed);
-        }
+        self.check()?;
         let mut frame = Frame(Vec::new());
         serde_json::to_writer(&mut frame, request).map_err(|_| Error::InvalidFrame)?;
         frame.0.push(b'\n');
@@ -208,6 +222,7 @@ impl<T: Read + Write> Client<T> {
     }
 
     fn frame(&mut self) -> Result<Response, Error> {
+        self.check()?;
         let mut line = Vec::new();
         match self
             .stream
@@ -216,6 +231,7 @@ impl<T: Read + Write> Client<T> {
             .read_until(b'\n', &mut line)
         {
             Ok(length) if length <= MAX_FRAME && line.last() == Some(&b'\n') => {
+                self.check()?;
                 match serde_json::from_slice(&line) {
                     Ok(frame) => Ok(frame),
                     Err(_) => self.invalidate(Error::InvalidFrame),
@@ -257,7 +273,22 @@ impl<T: Read + Write> Client<T> {
 
     fn invalidate<R>(&mut self, error: Error) -> Result<R, Error> {
         self.usable = false;
+        if let Some(policy) = &self.policy {
+            policy.shutdown();
+        }
         Err(error)
+    }
+
+    fn check(&mut self) -> Result<(), Error> {
+        if !self.usable {
+            return Err(Error::Closed);
+        }
+        if let Some(policy) = &self.policy
+            && let Err(error) = policy.remaining()
+        {
+            return self.invalidate(Error::Transport(error.kind()));
+        }
+        Ok(())
     }
 }
 
