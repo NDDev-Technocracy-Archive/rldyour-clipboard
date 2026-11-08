@@ -10,15 +10,19 @@ import tempfile
 import time
 from rldyour_clipboard import Client
 
-binary = pathlib.Path(__file__).resolve().parents[1] / 'daemon/target/release/rldyour-clipboardd'
+binary = pathlib.Path(__file__).resolve().parents[1] / 'target/release/rldyour-clipboardd'
 with tempfile.TemporaryDirectory(prefix='cb-', dir='/tmp') as root:
     root = str(pathlib.Path(root).resolve())
-    env = dict(os.environ, RLDYOUR_CLIPBOARD_HOME=root, RLDYOUR_CLIPBOARD_CAPTURE='0')
+    env = dict(os.environ)
     for key in ('LISTEN_PID', 'LISTEN_FDS', 'LISTEN_FDNAMES'):
         env.pop(key, None)
     path = pathlib.Path(root) / 'rldyour-clipboard.sock'
+    config = pathlib.Path(root) / 'clipboard.toml'
+    subprocess.run([str(binary), '--init-config', '--config', str(config),
+                    '--archive', root, '--socket', str(path), '--capture', 'false',
+                    '--budget-bytes', '5368709120', '--retention-days', '7'], check=True)
     def start():
-        process = subprocess.Popen([str(binary)], env=env, stdout=subprocess.DEVNULL)
+        process = subprocess.Popen([str(binary), '--config', str(config)], env=env, stdout=subprocess.DEVNULL)
         for _ in range(200):
             try:
                 with Client(path=path, watch=False):

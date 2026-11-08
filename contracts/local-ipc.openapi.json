@@ -1,0 +1,854 @@
+{
+  "components": {
+    "schemas": {
+      "Request": {
+        "oneOf": [
+          {
+            "properties": {
+              "op": {
+                "enum": [
+                  "hello"
+                ],
+                "type": "string"
+              },
+              "role": {
+                "$ref": "#/components/schemas/Role"
+              },
+              "v": {
+                "format": "int32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "watch": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "v",
+              "op"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "op": {
+                "enum": [
+                  "begin"
+                ],
+                "type": "string"
+              },
+              "req": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "source": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "req",
+              "op"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "bytes": {
+                "description": "Absent when the client does not know the length yet: the payload\nthen arrives as `chunk` frames ending with a zero-length one.",
+                "format": "int64",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "draft": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "mime": {
+                "type": "string"
+              },
+              "op": {
+                "enum": [
+                  "part"
+                ],
+                "type": "string"
+              },
+              "req": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "req",
+              "draft",
+              "mime",
+              "op"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "One piece of a length-less part. Carries no `req` because its position\nbetween a part and its terminator is what says where it belongs.",
+            "properties": {
+              "bytes": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "op": {
+                "enum": [
+                  "chunk"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "bytes",
+              "op"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "draft": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "op": {
+                "enum": [
+                  "commit"
+                ],
+                "type": "string"
+              },
+              "req": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "req",
+              "draft",
+              "op"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "draft": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "op": {
+                "enum": [
+                  "abort"
+                ],
+                "type": "string"
+              },
+              "req": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "req",
+              "draft",
+              "op"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "before": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "kind": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "limit": {
+                "format": "int32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "op": {
+                "enum": [
+                  "list"
+                ],
+                "type": "string"
+              },
+              "pinned": {
+                "description": "`true` lists only pinned (favourite) entries, `false` only the\nunpinned ones; absent lists everything.",
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "query": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "req": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "req",
+              "op"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "entry": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "mime": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "op": {
+                "enum": [
+                  "fetch"
+                ],
+                "type": "string"
+              },
+              "req": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "transcode": {
+                "description": "Asks the daemon to produce the representation by transcoding when\nthe entry does not literally hold it. The only pair defined is\n`image/*` → `image/bmp`, which the RDP clipboard channel relays.\nAnything else still answers `no-such-mime`.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "req",
+              "entry",
+              "op"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "entry": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "op": {
+                "enum": [
+                  "thumb"
+                ],
+                "type": "string"
+              },
+              "req": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "req",
+              "entry",
+              "op"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "entry": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "op": {
+                "enum": [
+                  "pin"
+                ],
+                "type": "string"
+              },
+              "pinned": {
+                "type": "boolean"
+              },
+              "req": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "req",
+              "entry",
+              "pinned",
+              "op"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "entry": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "op": {
+                "enum": [
+                  "remove"
+                ],
+                "type": "string"
+              },
+              "req": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "req",
+              "entry",
+              "op"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "op": {
+                "enum": [
+                  "clear"
+                ],
+                "type": "string"
+              },
+              "req": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "req",
+              "op"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "op": {
+                "enum": [
+                  "stats"
+                ],
+                "type": "string"
+              },
+              "req": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "req",
+              "op"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "Response": {
+        "oneOf": [
+          {
+            "properties": {
+              "budget": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "bytes": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "entries": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "ev": {
+                "enum": [
+                  "hello"
+                ],
+                "type": "string"
+              },
+              "retention_days": {
+                "format": "int64",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "v": {
+                "format": "int32",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "v",
+              "entries",
+              "bytes",
+              "budget",
+              "ev"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "ev": {
+                "enum": [
+                  "ok"
+                ],
+                "type": "string"
+              },
+              "req": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "req",
+              "ev"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "draft": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "ev": {
+                "enum": [
+                  "begin"
+                ],
+                "type": "string"
+              },
+              "req": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "req",
+              "draft",
+              "ev"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "created": {
+                "type": "boolean"
+              },
+              "entry": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "ev": {
+                "enum": [
+                  "commit"
+                ],
+                "type": "string"
+              },
+              "req": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "req",
+              "entry",
+              "created",
+              "ev"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "ev": {
+                "enum": [
+                  "list"
+                ],
+                "type": "string"
+              },
+              "items": {
+                "items": {
+                  "$ref": "#/components/schemas/Summary"
+                },
+                "type": "array"
+              },
+              "more": {
+                "type": "boolean"
+              },
+              "req": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "req",
+              "items",
+              "more",
+              "ev"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Always followed by `bytes` raw bytes.",
+            "properties": {
+              "bytes": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "ev": {
+                "enum": [
+                  "blob"
+                ],
+                "type": "string"
+              },
+              "mime": {
+                "type": "string"
+              },
+              "req": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "req",
+              "mime",
+              "bytes",
+              "ev"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "A thumbnail, as straight RGBA followed by `bytes` raw bytes.\n\nSeparate from `blob` because it is pixels rather than a file: the only\nway a GNOME Shell extension can draw arbitrary image data is to hand\n`St.ImageContent` a buffer and its geometry, so the geometry travels\nwith it rather than having to be decoded out of a container.",
+            "properties": {
+              "bytes": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "ev": {
+                "enum": [
+                  "thumb"
+                ],
+                "type": "string"
+              },
+              "height": {
+                "format": "int32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "req": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "stride": {
+                "format": "int32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "width": {
+                "format": "int32",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "req",
+              "width",
+              "height",
+              "stride",
+              "bytes",
+              "ev"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "budget": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "bytes": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "entries": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "ev": {
+                "enum": [
+                  "stats"
+                ],
+                "type": "string"
+              },
+              "pinned": {
+                "description": "How many of them are pinned — the favourites.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "req": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "retention_days": {
+                "format": "int64",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "req",
+              "entries",
+              "pinned",
+              "bytes",
+              "budget",
+              "ev"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "entry": {
+                "$ref": "#/components/schemas/Summary"
+              },
+              "ev": {
+                "enum": [
+                  "added"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "entry",
+              "ev"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "entry": {
+                "$ref": "#/components/schemas/Summary"
+              },
+              "ev": {
+                "enum": [
+                  "updated"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "entry",
+              "ev"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "entry": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "ev": {
+                "enum": [
+                  "removed"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "entry",
+              "ev"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "ev": {
+                "enum": [
+                  "cleared"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "ev"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "ev": {
+                "enum": [
+                  "error"
+                ],
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "req": {
+                "format": "int64",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "ev"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "Role": {
+        "enum": [
+          "capture",
+          "ui",
+          "both"
+        ],
+        "type": "string"
+      },
+      "Summary": {
+        "description": "What the UI needs to draw one archive entry without fetching its content.",
+        "properties": {
+          "at": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "bytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "height": {
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "mimes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "pinned": {
+            "type": "boolean"
+          },
+          "preview": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "thumb": {
+            "type": "boolean"
+          },
+          "width": {
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "mimes",
+          "bytes",
+          "thumb",
+          "pinned",
+          "at"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "",
+    "license": {
+      "identifier": "Apache-2.0",
+      "name": "Apache-2.0"
+    },
+    "title": "NDDev Clipboard local IPC",
+    "version": "0.2.2"
+  },
+  "openapi": "3.1.0",
+  "paths": {},
+  "x-transport": {
+    "framing": "UTF-8 JSON object and LF; declared payload bytes follow immediately",
+    "http_endpoints": false,
+    "max_control_frame_bytes": 65536,
+    "protocol_version": 1
+  }
+}

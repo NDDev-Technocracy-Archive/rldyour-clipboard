@@ -2,7 +2,7 @@ import Foundation
 @main struct SocketTests {
     static func main() {
         let done = DispatchSemaphore(value: 0)
-        let client = ClipboardClient(path: CommandLine.arguments[1])
+        let client = ClipboardClient(configuration: URL(fileURLWithPath: CommandLine.arguments[1]), daemon: URL(fileURLWithPath: CommandLine.arguments[2]))
         client.page(pinned: false, query: "native socket synthetic", before: nil) { result in
             let page = try! result.get()
             precondition(page.stats.retention_days == 7)

@@ -6,11 +6,8 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import {FrameReader, sliceBytes} from './framing.js';
 
-const SOCKET_NAME = 'rldyour-clipboard.sock';
-const PROTOCOL_VERSION = 1;
+import {PROTOCOL_VERSION, MAX_FRAME} from './contract.js';
 
-/** Refuse a control line long enough to mean the peer is not our daemon. */
-const MAX_FRAME = 64 * 1024;
 /** How much of a stream is forwarded per chunk frame. */
 const CHUNK = 64 * 1024;
 
@@ -20,6 +17,8 @@ const RECONNECT_MAX_SECONDS = 30;
 Gio._promisify(Gio.SocketClient.prototype, 'connect_async');
 Gio._promisify(Gio.InputStream.prototype, 'read_bytes_async');
 Gio._promisify(Gio.OutputStream.prototype, 'write_bytes_async');
+Gio._promisify(Gio.Subprocess.prototype, 'communicate_utf8_async');
+Gio._promisify(Gio.Subprocess.prototype, 'wait_async');
 
 /**
  * Speaks the daemon's protocol from inside the shell process.
@@ -39,10 +38,15 @@ export class Client {
      * @param {(event: object) => void} [options.onEvent] archive broadcasts
      * @param {(connected: boolean) => void} [options.onState] link changes
      */
-    constructor({role = 'ui', onEvent = () => {}, onState = () => {}} = {}) {
+    constructor({role = 'ui', onEvent = () => {}, onState = () => {},
+        socketPath = null, configPath = null, daemonPath = null} = {}) {
         this._role = role;
         this._onEvent = onEvent;
         this._onState = onState;
+        this._socketPath = socketPath;
+        this._configPath = configPath;
+        this._daemonPath = daemonPath ?? GLib.build_filenamev([
+            GLib.get_home_dir(), '.local', 'bin', 'rldyour-clipboardd']);
 
         this._cancellable = new Gio.Cancellable();
         this._connection = null;
@@ -69,11 +73,8 @@ export class Client {
     }
 
     async _connect() {
-        // RLDYOUR_CLIPBOARD_HOME relocates archive and socket together on
-        // every platform; the runtime directory is the production default.
-        const root = GLib.getenv('RLDYOUR_CLIPBOARD_HOME')
-            ?? GLib.get_user_runtime_dir();
-        const path = GLib.build_filenamev([root, SOCKET_NAME]);
+        const path = this._socketPath ?? await this._resolveSocket();
+        if (this._stopped) return;
         const connection = await new Gio.SocketClient().connect_async(
             new Gio.UnixSocketAddress({path}), this._cancellable);
 
@@ -91,11 +92,34 @@ export class Client {
         const greeting = await this._readFrame();
         if (greeting?.ev !== 'hello' || greeting.v !== PROTOCOL_VERSION)
             throw new Error(`unexpected greeting from the daemon: ${JSON.stringify(greeting)}`);
+        if (this._stopped || connection !== this._connection) return;
 
         this._hello = greeting;
         this._backoff = RECONNECT_MIN_SECONDS;
         this._onState(true);
         this._dispatch(connection, this._input).catch(() => this._retry(connection));
+    }
+
+    /** The product's Rust parser is the only reader of application settings. */
+    async _resolveSocket() {
+        const args = [this._daemonPath, '--socket-json'];
+        if (this._configPath !== null) args.push('--config', this._configPath);
+        const process = Gio.Subprocess.new(args,
+            Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
+        try {
+            const [, output] = await process.communicate_utf8_async(null, this._cancellable);
+            if (!process.get_successful() || output.length > 16 * 1024)
+                throw new Error('Clipboard configuration is unavailable');
+            const path = JSON.parse(output);
+            if (typeof path !== 'string' || !GLib.path_is_absolute(path) || /[\x00-\x1f]/u.test(path))
+                throw new Error('Clipboard endpoint is invalid');
+            return path;
+        } finally {
+            if (this._cancellable.is_cancelled()) {
+                if (process.get_identifier() !== null) process.force_exit();
+                await process.wait_async(null);
+            }
+        }
     }
 
     /** Reads answers and broadcasts until the connection ends. */

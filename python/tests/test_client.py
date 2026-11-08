@@ -95,11 +95,20 @@ def daemon(request):
     stub.close()
 
 
-def test_the_home_override_relocates_the_socket(monkeypatch, tmp_path):
-    # The daemon resolves the same rule, so the socket follows the archive
-    # it serves wherever the variable points — on every platform.
-    monkeypatch.setenv("RLDYOUR_CLIPBOARD_HOME", str(tmp_path))
-    assert socket_path() == tmp_path / "rldyour-clipboard.sock"
+def test_the_product_resolves_the_explicit_profile_without_opening_its_archive(tmp_path):
+    archive = tmp_path / "unused-archive"
+    endpoint = tmp_path / "endpoint.sock"
+    config = tmp_path / "clipboard.toml"
+    config.write_text(
+        "schema = 1\narchive_dir = " + json.dumps(str(archive))
+        + "\nsocket_path = " + json.dumps(str(endpoint))
+        + "\nbudget_bytes = 0\nretention_days = 0\ncapture_native = false\n"
+    )
+    assert socket_path(config) == endpoint
+    assert not archive.exists() and not endpoint.exists()
+    config.write_text("capture_native = false\n")
+    with pytest.raises(RuntimeError, match="configuration"):
+        socket_path(config)
 
 
 def test_greets_with_the_protocol_version_and_role():

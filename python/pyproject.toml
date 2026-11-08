@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rldyour-clipboard"
-version = "0.2.2"
+dynamic = ["version"]
 description = "Python client for the rldyour-clipboard archive daemon"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -27,3 +27,6 @@ rldyour-clipboard = "rldyour_clipboard:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rldyour_clipboard"]
+
+[tool.hatch.version]
+path = "src/rldyour_clipboard/_contract.py"

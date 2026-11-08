@@ -2,7 +2,7 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
-const MAX_FRAME = 64 * 1024;
+import {MAX_FRAME} from './contract.js';
 const CHUNK = 64 * 1024;
 const DECODER = new TextDecoder('utf-8', {fatal: true});
 Gio._promisify(Gio.InputStream.prototype, 'read_bytes_async', 'read_bytes_finish');

@@ -8,7 +8,7 @@ private final class Connection {
     private var buffer = Data()
     private var next: UInt64 = 1
     private let decoder = JSONDecoder()
-    private static let frameLimit = 64 * 1024
+    private static let frameLimit = ClipboardContract.maxFrame
     init(path: String) throws {
         fd = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { throw ClipboardFailure(message: "Не удалось открыть локальный сокет") }
@@ -33,7 +33,7 @@ private final class Connection {
                 }
             }
             guard result == 0 else { throw ClipboardFailure(message: "Демон буфера пока недоступен") }
-            try send(["op": "hello", "v": 1, "role": "ui", "watch": false])
+            try send(["op": "hello", "v": ClipboardContract.protocolVersion, "role": "ui", "watch": false])
             let hello = try frame()
             guard hello.ev == "hello", hello.v == 1 else { throw ClipboardFailure(message: "Несовместимая версия демона") }
         } catch { Darwin.close(fd); throw error }
@@ -133,19 +133,38 @@ private final class Connection {
 
 final class ClipboardClient: @unchecked Sendable {
     private let queue = DispatchQueue(label: "io.nddev.rldyour-clipboard.query", qos: .utility)
-    private let path: String
-    private let transfers: URL
-    init(path: String? = nil) {
-        let root = path.map { URL(fileURLWithPath: $0).deletingLastPathComponent() }
-            ?? ProcessInfo.processInfo.environment["RLDYOUR_CLIPBOARD_HOME"].map { URL(fileURLWithPath: $0) }
-            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/rldyour-clipboard")
-        self.path = path ?? root.appendingPathComponent("rldyour-clipboard.sock").path
-        transfers = root.appendingPathComponent("transfers")
+    private let path: String?
+    private let configuration: URL?
+    private let daemon: URL
+    init(path: String? = nil, configuration: URL? = nil, daemon: URL? = nil) {
+        self.path = path
+        self.configuration = configuration
+        self.daemon = daemon ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin/rldyour-clipboardd")
+    }
+    // All callers run on the utility queue. The UI thread never waits for a
+    // process or parses a second copy of the application's settings.
+    private func resolvedPath() throws -> String {
+        if let path { return path }
+        let process = Process()
+        process.executableURL = daemon
+        process.arguments = ["--socket-json"]
+        if let configuration { process.arguments! += ["--config", configuration.path] }
+        let output = Pipe()
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0, data.count <= 16 * 1024,
+            let path = try? JSONDecoder().decode(String.self, from: data),
+            path.hasPrefix("/"), !path.unicodeScalars.contains(where: { $0.value < 32 })
+        else { throw ClipboardFailure(message: "Конфигурация Clipboard недоступна или неверна") }
+        return path
     }
     func page(pinned: Bool, query: String, before: Int64?, done: @escaping @Sendable (Result<ClipboardPage, Error>) -> Void) {
         queue.async {
             do {
-                let connection = try Connection(path: self.path)
+                let connection = try Connection(path: self.resolvedPath())
                 let stats = try connection.stats()
                 var fields: [String: Any] = ["pinned": pinned, "limit": 20]
                 if !query.isEmpty { fields["query"] = query }
@@ -158,19 +177,21 @@ final class ClipboardClient: @unchecked Sendable {
     }
     func pin(_ entry: ClipboardEntry, done: @escaping @Sendable (Result<Void, Error>) -> Void) {
         queue.async {
-            do { _ = try Connection(path: self.path).request("pin", fields: ["entry": entry.id, "pinned": !entry.pinned]); done(.success(())) }
+            do { _ = try Connection(path: self.resolvedPath()).request("pin", fields: ["entry": entry.id, "pinned": !entry.pinned]); done(.success(())) }
             catch { done(.failure(error)) }
         }
     }
     func fetch(_ entry: ClipboardEntry, done: @escaping @Sendable (Result<[ClipboardTransfer], Error>) -> Void) {
         queue.async {
             do {
-                try FileManager.default.createDirectory(at: self.transfers, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-                let connection = try Connection(path: self.path)
+                let transfers = FileManager.default.temporaryDirectory.appendingPathComponent("nddev-clipboard-" + UUID().uuidString)
+                try FileManager.default.createDirectory(at: transfers, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+                defer { try? FileManager.default.removeItem(at: transfers) }
+                let connection = try Connection(path: self.resolvedPath())
                 let mimes = ClipboardTypes.supported(entry)
                 guard !mimes.isEmpty else { throw ClipboardFailure(message: "Формат записи нельзя восстановить в AppKit") }
                 var files: [ClipboardTransfer] = []
-                for mime in mimes { files.append(try connection.transfer(entry: entry.id, mime: mime, directory: self.transfers)) }
+                for mime in mimes { files.append(try connection.transfer(entry: entry.id, mime: mime, directory: transfers)) }
                 done(.success(files))
             } catch { done(.failure(error)) }
         }

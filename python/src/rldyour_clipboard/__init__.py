@@ -12,18 +12,14 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import socket
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any, BinaryIO, Iterator, NamedTuple, Optional, Sequence, TypedDict
 
-__version__ = "0.2.2"
-
-PROTOCOL_VERSION = 1
-
-#: Control frames are small by construction; anything longer is not one.
-MAX_FRAME = 64 * 1024
+from ._contract import __version__, PROTOCOL_VERSION, MAX_FRAME
 
 
 class Summary(TypedDict):
@@ -72,27 +68,30 @@ class ProtocolError(RuntimeError):
         self.code = code
 
 
-def socket_path() -> Path:
-    """Return the daemon socket used by the current platform.
+def socket_path(config: Optional[Path] = None, *, daemon: Optional[Path] = None) -> Path:
+    """Resolve the endpoint with the product's typed Rust configuration reader.
 
-    ``RLDYOUR_CLIPBOARD_HOME`` relocates archive and socket together on every
-    platform — the daemon resolves the same way — so the override wins first.
+    This command reads settings only. It opens no archive or connection and
+    never starts clipboard capture. Explicit ``Client(path=...)`` is useful
+    for integrations which already own an endpoint selection.
     """
-    override = os.environ.get("RLDYOUR_CLIPBOARD_HOME")
-    if override:
-        return Path(override) / "rldyour-clipboard.sock"
-    if sys.platform == "darwin":
-        return (
-            Path.home()
-            / "Library/Application Support/rldyour-clipboard/rldyour-clipboard.sock"
-        )
-    if os.name == "nt":
-        root = os.environ.get("LOCALAPPDATA")
-        if not root:
-            raise RuntimeError("LOCALAPPDATA is unset")
-        return Path(root) / "rldyour-clipboard/rldyour-clipboard.sock"
-    runtime = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
-    return Path(runtime) / "rldyour-clipboard.sock"
+    executable = daemon or shutil.which("rldyour-clipboardd")
+    if executable is None:
+        executable = Path.home() / ".local/bin/rldyour-clipboardd"
+    arguments = [str(executable), "--socket-json"]
+    if config is not None:
+        arguments += ["--config", str(config)]
+    try:
+        result = subprocess.run(arguments, check=True, stdout=subprocess.PIPE,
+                                stderr=subprocess.DEVNULL, timeout=5)
+        if len(result.stdout) > 16 * 1024:
+            raise ValueError("oversized endpoint")
+        value = json.loads(result.stdout)
+        if not isinstance(value, str) or not Path(value).is_absolute() or any(ord(c) < 32 for c in value):
+            raise ValueError("invalid endpoint")
+        return Path(value)
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        raise RuntimeError("Clipboard configuration is unavailable or invalid") from error
 
 
 class EntryPage(list[Summary]):
@@ -110,8 +109,9 @@ class Client:
     connection drops.
     """
 
-    def __init__(self, path: Optional[Path] = None, role: str = "ui", watch: bool = True) -> None:
-        self._path = path or socket_path()
+    def __init__(self, path: Optional[Path] = None, role: str = "ui", watch: bool = True,
+                 *, config: Optional[Path] = None) -> None:
+        self._path = path or socket_path(config)
         self._role = role
         self._watch = watch
         self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -397,6 +397,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         prog="rldyour-clipboard",
         description="Read the local rldyour-clipboard archive.",
     )
+    parser.add_argument("--config", type=Path, help="absolute Clipboard TOML file")
     sub = parser.add_subparsers(dest="command")
 
     listing = sub.add_parser("list", help="show recent entries")
@@ -425,7 +426,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     command = arguments.command or "list"
 
     try:
-        with Client(watch=False) as client:
+        with Client(watch=False, config=arguments.config) as client:
             if command == "list":
                 for entry in client.list(
                     limit=arguments.limit,
@@ -457,11 +458,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     print(json.dumps(event, separators=(",", ":")))
     except FileNotFoundError:
         print(
-            f"rldyour-clipboard: no daemon at {socket_path()}",
+            "rldyour-clipboard: the configured daemon is unavailable",
             file=sys.stderr,
         )
         return 1
-    except (ProtocolError, ConnectionError) as error:
+    except (ProtocolError, ConnectionError, RuntimeError) as error:
         print(f"rldyour-clipboard: {error}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:

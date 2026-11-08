@@ -44,7 +44,9 @@ def check(condition: bool, what: str) -> None:
 
 
 def main() -> int:
-    with Client(role="both") as client:
+    from pathlib import Path
+    config = Path(sys.argv[1]) if len(sys.argv) == 2 else None
+    with Client(role="both", config=config) as client:
         check(client.hello["v"] == 1, "daemon greets with protocol version 1")
 
         print("Text with two representations")

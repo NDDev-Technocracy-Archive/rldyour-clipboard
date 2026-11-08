@@ -4,7 +4,7 @@ import {Client} from '../lib/client.js';
 const loop = new GLib.MainLoop(null, false);
 let error = null;
 let running = false;
-const client = new Client({role: 'both', onState: connected => {
+const client = new Client({role: 'both', configPath: ARGV[0], daemonPath: ARGV[1], onState: connected => {
     if (!connected || running) return;
     running = true;
     test().catch(e => { error = e; }).finally(() => { client.stop(); loop.quit(); });

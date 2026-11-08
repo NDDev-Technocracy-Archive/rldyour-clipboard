@@ -1,7 +1,7 @@
 {
-  "uuid": "rldyour-clipboard@nddev-opennetwork",
+  "description": "Keeps what you copy — text, images and files, at any size — and puts it back when you pick it.\n\nA tray icon beside your other indicators opens a picker; the entry you choose is pasted into whatever you were typing in. Everything is archived by a companion daemon over a private socket, so the shell process itself stores nothing, hashes nothing and decodes no images.",
   "name": "NDDev Clipboard",
-  "description": "Keeps what you copy \u2014 text, images and files, at any size \u2014 and puts it back when you pick it.\n\nA tray icon beside your other indicators opens a picker; the entry you choose is pasted into whatever you were typing in. Everything is archived by a companion daemon over a private socket, so the shell process itself stores nothing, hashes nothing and decodes no images.",
+  "settings-schema": "org.gnome.shell.extensions.rldyour-clipboard",
   "shell-version": [
     "46",
     "47",
@@ -10,7 +10,7 @@
     "50"
   ],
   "url": "https://github.com/NDDev-Technocracy-OpenNetwork/nddev-clipboard",
-  "version": 3,
-  "settings-schema": "org.gnome.shell.extensions.rldyour-clipboard",
+  "uuid": "rldyour-clipboard@nddev-opennetwork",
+  "version": 2002,
   "version-name": "0.2.2"
 }
