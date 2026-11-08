@@ -143,6 +143,20 @@ fn generated(root: &Path, write: bool) -> Result<(), Box<dyn std::error::Error>>
         &(serde_json::to_string_pretty(&package)? + "\n"),
         write,
     )?;
+    let icons: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(
+        root.join("ui/vendor/opennetwork/icons.json"),
+    )?)?;
+    for (name, icon) in [
+        ("brand", &icons["brand"]),
+        ("clip", &icons["icons"]["clip"]),
+    ] {
+        let view_box = icon["viewBox"].as_str().ok_or("icon view box is missing")?;
+        let body = icon["body"].as_str().ok_or("icon body is missing")?;
+        let svg = format!(
+            "<!-- Generated from the pinned OpenNetwork icon package. -->\n<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{view_box}\" fill=\"currentColor\">{body}</svg>\n"
+        );
+        output(root, &format!("ui/generated/icons/{name}.svg"), &svg, write)?;
+    }
     println!("generated contracts are current ({version})");
     Ok(())
 }

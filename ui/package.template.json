@@ -6,12 +6,10 @@
   "scripts": {
     "generate": "openapi-ts",
     "check": "biome check src preview tests locales *.json && oxlint --type-aware src preview && knip && bun node_modules/@typescript/native/bin/tsc --noEmit",
-    "build": "bun build ./index.html --outdir ./dist --target browser --minify",
     "build:preview": "bun build ./preview/index.html --outdir ./dist-preview --target browser --minify",
     "test": "playwright test"
   },
   "dependencies": {
-    "@tauri-apps/api": "2.12.4",
     "i18next": "26.7.1",
     "i18next-icu": "2.6.1",
     "react": "19.3.1",

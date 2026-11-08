@@ -1,0 +1,64 @@
+name: History window browser qualification
+
+on:
+  push:
+    branches: [task/14-standalone-product]
+    paths: ['ui/**', 'contracts/**', 'crates/api/**', 'tools/**', 'Cargo*', '.github/workflows/ui-preview.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  history-view:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DO_NOT_TRACK: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f
+        with:
+          toolchain: '1.99.1'
+          cache: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: '1.4.4'
+      - name: Produce the candidate from the Rust contract
+        run: |
+          cargo build --locked -p clipboard-tools
+          target/debug/clipboard-tools generate
+          cd ui
+          bun install --frozen-lockfile --ignore-scripts
+          bun run generate
+      - name: Check the history view sources
+        working-directory: ui
+        run: bun run check
+      - name: Build and exercise the isolated browser view
+        working-directory: ui
+        run: |
+          bun run build:preview
+          bunx --no-install playwright install --with-deps chromium firefox webkit
+          bun run test
+      - name: Preserve the generated candidate
+        if: always()
+        run: |
+          mkdir -p .build/frontend-candidate
+          cp -R ui/generated .build/frontend-candidate/
+          cp ui/package.json .build/frontend-candidate/
+          cp contracts/local-ipc.openapi.json .build/frontend-candidate/
+          cp target/debug/clipboard-tools .build/frontend-candidate/
+          git rev-parse HEAD > .build/frontend-candidate/source-commit
+          cd .build/frontend-candidate
+          find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: history-window-${{ github.sha }}
+          path: |
+            ui/test-results/
+            ui/playwright-report/
+            .build/frontend-candidate/
+          if-no-files-found: error
+          retention-days: 7

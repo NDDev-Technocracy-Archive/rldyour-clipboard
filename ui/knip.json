@@ -1,0 +1,5 @@
+{
+  "entry": ["preview/main.tsx", "playwright.config.ts"],
+  "project": ["src/**/*.{ts,tsx}", "preview/**/*.{ts,tsx}", "tests/**/*.ts"],
+  "ignoreDependencies": ["oxlint-tsgolint"]
+}

@@ -1,0 +1,13 @@
+{
+  "design": {
+    "repository": "NDDev-Technocracy-OpenNetwork/nddev-opennetwork-design-system",
+    "repository_id": 1411020218,
+    "release": "v0.0.1-alpha.9",
+    "revision": "dbdf11b27fc6245b7942ad3e271f171602fce931",
+    "tree": "591b2a86f5e9b3e780024012dcb19a2a12f5cf3a",
+    "digest": "d90ae373c516a61c145cfe570648bc9113176ba125ee958aa98d668f2fd6a8d1",
+    "files": 235,
+    "path": "vendor/opennetwork",
+    "algorithm": "sha256 of sorted POSIX relative name, NUL, u64 little-endian length, file bytes"
+  }
+}
