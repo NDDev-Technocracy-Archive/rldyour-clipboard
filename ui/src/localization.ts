@@ -1,10 +1,10 @@
 import i18next from "i18next";
 import ICU from "i18next-icu";
-import ar from "../locales/ar.json";
-import en from "../locales/en.json";
-import kk from "../locales/kk.json";
-import ru from "../locales/ru.json";
-import zh from "../locales/zh.json";
+import ar from "../locales/ar.json" with { type: "json" };
+import en from "../locales/en.json" with { type: "json" };
+import kk from "../locales/kk.json" with { type: "json" };
+import ru from "../locales/ru.json" with { type: "json" };
+import zh from "../locales/zh.json" with { type: "json" };
 
 export const resources = { ru, en, kk, ar, zh };
 export type Language = keyof typeof resources;
