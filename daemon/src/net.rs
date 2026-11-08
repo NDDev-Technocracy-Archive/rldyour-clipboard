@@ -16,16 +16,24 @@ pub struct BoundListener {
     pub pending: Option<Stream>,
 }
 
-/// Uses only the explicitly selected private local endpoint.
-pub fn bind(path: &std::path::Path) -> std::io::Result<BoundListener> {
+/// Inspect existing activation authority before opening an archive. This never
+/// creates an endpoint or reads a pending client's control/content bytes.
+pub fn inherited(path: &std::path::Path) -> io::Result<Option<BoundListener>> {
     #[cfg(unix)]
     if let Some(inherited) = nddev_clipboard_platform::inherited_listener(path)? {
-        return Ok(BoundListener {
+        return Ok(Some(BoundListener {
             listener: inherited.listener,
             activated: true,
             pending: inherited.pending,
-        });
+        }));
     }
+    #[cfg(windows)]
+    let _ = path;
+    Ok(None)
+}
+
+/// Publish a self-bound endpoint only after the caller owns its archive lease.
+pub fn bind(path: &std::path::Path) -> std::io::Result<BoundListener> {
     let parent = path
         .parent()
         .ok_or_else(|| io::Error::other("socket has no parent"))?;

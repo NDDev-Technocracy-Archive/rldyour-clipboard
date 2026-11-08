@@ -13,6 +13,7 @@ const MAX_CONNECTIONS: usize = 32;
 pub(crate) static CONNECTED: AtomicUsize = AtomicUsize::new(0);
 
 pub fn run(config: nddev_clipboard_api::Config) -> std::io::Result<()> {
+    let inherited = crate::net::inherited(config.socket_path())?;
     let root = config.archive_dir();
     let store = Arc::new(
         store::Store::open_with_policy(root, config.budget_bytes(), config.retention_seconds())
@@ -23,7 +24,10 @@ pub fn run(config: nddev_clipboard_api::Config) -> std::io::Result<()> {
         listener,
         activated: socket_activated,
         pending,
-    } = crate::net::bind(config.socket_path())?;
+    } = match inherited {
+        Some(listener) => listener,
+        None => crate::net::bind(config.socket_path())?,
+    };
 
     // A crash between a commit and its blob sweep leaves files nothing points
     // at. Startup is the only moment nothing else is writing, so it is the

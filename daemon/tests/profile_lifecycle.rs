@@ -345,6 +345,53 @@ fn systemd_activation_serves_the_triggering_connection_without_a_second_listener
     );
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn a_mismatched_activation_endpoint_does_not_open_the_archive() {
+    let fixture = Fixture::new();
+    let profile = fixture.profile("clipboard.toml", "untouched", "selected.sock");
+    let foreign = fixture.0.join("different.sock");
+    let mut process = Command::new("systemd-socket-activate");
+    process
+        .arg("--listen")
+        .arg(&foreign)
+        .arg(env!("CARGO_BIN_EXE_rldyour-clipboardd"))
+        .arg("--config")
+        .arg(&profile);
+    for name in ["LISTEN_FDS", "LISTEN_PID", "LISTEN_FDNAMES"] {
+        process.env_remove(name);
+    }
+    let mut daemon = Daemon(process.stdout(Stdio::null()).spawn().unwrap());
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let _trigger = loop {
+        if let Ok(stream) = Stream::connect(&foreign) {
+            break stream;
+        }
+        assert!(
+            daemon.0.try_wait().unwrap().is_none(),
+            "activation fixture exited before binding"
+        );
+        assert!(
+            Instant::now() < deadline,
+            "activation fixture did not publish an endpoint"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    loop {
+        if let Some(status) = daemon.0.try_wait().unwrap() {
+            assert!(!status.success());
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "mismatched activation was not refused"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(!fixture.0.join("untouched").exists());
+    assert!(!fixture.0.join("selected.sock").exists());
+}
+
 #[cfg(target_os = "macos")]
 #[test]
 fn launchd_activation_serves_the_triggering_connection_without_a_second_listener() {
