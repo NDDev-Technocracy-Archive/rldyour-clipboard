@@ -31,7 +31,6 @@ const INDEXED_TEXT: u64 = 64 * 1024;
 const THUMBNAILED_IMAGE: u64 = 64 * 1024 * 1024;
 
 /// Bytes the archive may occupy before the oldest unpinned entries are evicted.
-pub const DEFAULT_BUDGET: i64 = 5 * 1024 * 1024 * 1024;
 
 pub struct Store {
     blobs: Blobs,
@@ -659,40 +658,10 @@ fn identity(accepted: &[Accepted]) -> String {
         .collect()
 }
 
-/// The archive directory for this platform.
-pub fn default_root() -> io::Result<PathBuf> {
-    #[cfg(target_os = "linux")]
-    {
-        if let Some(data) = std::env::var_os("XDG_DATA_HOME") {
-            return Ok(Path::new(&data).join("rldyour-clipboard"));
-        }
-        let home = std::env::var_os("HOME")
-            .ok_or_else(|| io::Error::other("HOME and XDG_DATA_HOME are unset"))?;
-        return Ok(Path::new(&home).join(".local/share/rldyour-clipboard"));
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        let home = std::env::var_os("HOME").ok_or_else(|| io::Error::other("HOME is unset"))?;
-        // Application Support, not Caches: Caches is purgeable under disk
-        // pressure, and an archive that silently empties is worse than none.
-        return Ok(Path::new(&home).join("Library/Application Support/rldyour-clipboard"));
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        let base = std::env::var_os("LOCALAPPDATA")
-            .ok_or_else(|| io::Error::other("LOCALAPPDATA is unset"))?;
-        return Ok(Path::new(&base).join("rldyour-clipboard"));
-    }
-
-    #[allow(unreachable_code)]
-    Err(io::Error::other("no archive location on this platform"))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    const DEFAULT_BUDGET: i64 = 5 * 1024 * 1024 * 1024;
 
     #[test]
     fn missing_blob_cannot_be_claimed_as_a_durable_pin() {
