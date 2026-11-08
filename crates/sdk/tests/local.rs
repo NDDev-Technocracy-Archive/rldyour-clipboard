@@ -78,8 +78,9 @@ fn cancellation_interrupts_the_owned_connected_socket_before_its_deadline() {
     let cancellation = operation.cancellation();
     std::thread::scope(|scope| {
         let (send, receive) = mpsc::sync_channel(1);
-        scope.spawn(|| {
-            send.send(operation.connect(&endpoint.path, Role::Both).map(|_| ()))
+        let path = &endpoint.path;
+        scope.spawn(move || {
+            send.send(operation.connect(path, Role::Both).map(|_| ()))
                 .unwrap();
         });
         let _peer = endpoint.accept_hello();
