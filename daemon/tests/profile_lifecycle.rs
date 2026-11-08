@@ -8,7 +8,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 #[path = "support/image.rs"]
+#[cfg(not(windows))]
 mod fixture_image;
+#[cfg(not(windows))]
+use fixture_image::PNG;
+#[cfg(windows)]
+use native_clipboard::PNG;
 
 #[cfg(unix)]
 use std::os::unix::net::UnixStream as Stream;
@@ -292,7 +297,7 @@ fn record_synthetic_files(root: &Path, endpoint: &Path) -> SyntheticFiles {
     std::fs::create_dir(&originals).unwrap();
     let large = originals.join("large.bin");
     let photo = originals.join("photo.png");
-    std::fs::write(&photo, fixture_image::PNG).unwrap();
+    std::fs::write(&photo, PNG).unwrap();
     let mut output = std::fs::File::create(&large).unwrap();
     let buffer = [0x4b; 64 * 1024];
     let length = 3 * 1024 * 1024 + 17;
@@ -317,7 +322,7 @@ fn record_synthetic_files(root: &Path, endpoint: &Path) -> SyntheticFiles {
         FileNode {
             path: vec!["files".into(), "Фото.png".into()],
             content: FileContent::File {
-                bytes: fixture_image::PNG.len() as u64,
+                bytes: PNG.len() as u64,
             },
         },
     ];
@@ -443,7 +448,7 @@ fn restore_synthetic_files(
     assert_eq!(hash.finalize().to_vec(), expected.large_digest);
     assert_eq!(
         std::fs::read(destination.join("files/Фото.png")).unwrap(),
-        fixture_image::PNG
+        PNG
     );
 }
 
