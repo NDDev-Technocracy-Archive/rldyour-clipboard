@@ -235,7 +235,7 @@ pub fn default_config_path() -> Result<PathBuf, ConfigError> {
     if !root.is_absolute() {
         return Err(ConfigError::Location);
     }
-    Ok(root.join("nddev").join("clipboard.toml"))
+    Ok(root.join("nddev").join("clipboard").join("config.toml"))
 }
 
 /// Placement used by explicit profile initialization, never as runtime fallback.

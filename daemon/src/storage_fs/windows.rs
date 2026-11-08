@@ -7,8 +7,8 @@ use std::{
 pub fn redirected(md: &Metadata) -> bool {
     md.file_type().is_symlink() || md.file_attributes() & 0x400 != 0
 }
-pub fn private_dir(_path: &Path) -> io::Result<()> {
-    Ok(())
+pub fn private_dir(path: &Path) -> io::Result<()> {
+    std::fs::create_dir_all(path)
 } // inherited private user-profile ACL
 pub fn open_options(options: &mut OpenOptions) {
     options.custom_flags(0x0020_0000);

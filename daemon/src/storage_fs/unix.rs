@@ -1,14 +1,24 @@
 use std::{
     fs::{self, Metadata, OpenOptions},
     io,
-    os::unix::fs::{OpenOptionsExt, PermissionsExt},
+    os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt},
     path::Path,
 };
 pub fn redirected(md: &Metadata) -> bool {
     md.file_type().is_symlink()
 }
 pub fn private_dir(path: &Path) -> io::Result<()> {
-    fs::set_permissions(path, fs::Permissions::from_mode(0o700))
+    fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(path)?;
+    if fs::metadata(path)?.permissions().mode() & 0o077 != 0 {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "Clipboard requires a private directory; existing permissions were preserved",
+        ));
+    }
+    Ok(())
 }
 pub fn open_options(options: &mut OpenOptions) {
     options

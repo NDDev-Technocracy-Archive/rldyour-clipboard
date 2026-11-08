@@ -12,7 +12,6 @@ nddev-clipboard-api.workspace = true
 serde_json.workspace = true
 toml.workspace = true
 sha2.workspace = true
-regex.workspace = true
 utoipa.workspace = true
 
 [build-dependencies]

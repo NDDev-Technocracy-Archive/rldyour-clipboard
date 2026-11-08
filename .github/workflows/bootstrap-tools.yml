@@ -3,6 +3,7 @@ name: Bootstrap source tooling
 on:
   push:
     branches: [task/14-standalone-product]
+    paths: ['Cargo*', 'crates/**', 'daemon/**', 'tools/**', 'rust-toolchain.toml', '.github/workflows/bootstrap-tools.yml']
 
 permissions:
   contents: read
@@ -15,6 +16,9 @@ jobs:
         os: [ubuntu-24.04, macos-26, macos-26-intel, windows-2025]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:

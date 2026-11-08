@@ -52,7 +52,6 @@ pub fn plain(path: &Path) -> io::Result<()> {
 }
 pub fn private_dir(path: &Path) -> io::Result<()> {
     plain(path)?;
-    fs::create_dir_all(path)?;
     platform::private_dir(path)
 }
 pub fn regular(path: &Path) -> io::Result<()> {
@@ -119,5 +118,22 @@ mod tests {
         std::os::unix::fs::symlink(&path, &link).unwrap();
         assert!(private_dir(&link).is_err());
         assert!(regular(&link.join("entry")).is_err());
+    }
+    #[cfg(unix)]
+    #[test]
+    fn an_existing_shared_directory_is_refused_without_changing_its_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let f = crate::testing::TempDir::new();
+        let path = f.path().join("shared");
+        fs::create_dir(&path).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+        assert_eq!(
+            private_dir(&path).unwrap_err().kind(),
+            io::ErrorKind::PermissionDenied
+        );
+        assert_eq!(
+            fs::metadata(path).unwrap().permissions().mode() & 0o777,
+            0o755
+        );
     }
 }
