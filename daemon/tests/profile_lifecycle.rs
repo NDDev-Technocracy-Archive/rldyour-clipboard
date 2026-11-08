@@ -393,7 +393,7 @@ fn launchd_activation_serves_the_triggering_connection_without_a_second_listener
         .trim()
         .parse()
         .unwrap();
-    let domain = format!("user/{uid}");
+    let domain = format!("gui/{uid}");
     let label = format!("ai.nddev.clipboard.fixture.{}", std::process::id());
     let plist = fixture.0.join("activation.plist");
     let content = format!(
