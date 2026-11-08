@@ -1,6 +1,7 @@
 [workspace]
 members = ["daemon", "crates/api", "crates/sdk", "crates/platform", "tools/clipboard-tools"]
 resolver = "3"
+exclude = ["qualification/windows-clipboard"]
 
 [workspace.package]
 version = "0.2.2"
