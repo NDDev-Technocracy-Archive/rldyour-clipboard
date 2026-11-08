@@ -167,7 +167,7 @@ mod tests {
     fn summary(id: i64) -> Summary {
         Summary {
             id,
-            kind: "text",
+            kind: "text".into(),
             mimes: vec!["text/plain".into()],
             bytes: 4,
             preview: Some("text".into()),
