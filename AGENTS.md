@@ -32,9 +32,10 @@ contracts and UI projections. `just test` and `just test-browser` belong on exec
 Keep the Windows occupied-path preservation regression enabled; its failure blocks release.
 The temporary branch workflows do not qualify installation or replace the final delivery gates.
 
-The native boundary ADR is under discussion. No new native exception is approved implicitly.
-API, SDK and tooling forbid unsafe Rust. Keep legacy native code contained until the agreed
-boundary is implemented and every unsafe operation has its native qualification.
+ADR 0001 permits only the small native boundary for service-manager listener acquisition and
+the Windows endpoint tag query. It does not retain the legacy unsafe capture implementation.
+API, SDK and tooling forbid unsafe Rust. Move ordinary daemon logic to that same restriction
+as the native adapters finish migration. Every direct operation needs native qualification.
 
 ## Data and lifecycle
 

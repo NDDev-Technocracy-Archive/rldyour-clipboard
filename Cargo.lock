@@ -396,6 +396,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "nddev-clipboard-platform"
+version = "0.2.2"
+dependencies = [
+ "uds_windows",
+ "windows-sys",
+]
+
+[[package]]
 name = "nddev-clipboard-sdk"
 version = "0.2.2"
 dependencies = [
@@ -517,6 +525,7 @@ dependencies = [
  "image",
  "libc",
  "nddev-clipboard-api",
+ "nddev-clipboard-platform",
  "nddev-clipboard-sdk",
  "objc2",
  "objc2-app-kit",

@@ -45,6 +45,10 @@ fn bind_at(path: &std::path::Path) -> io::Result<Listener> {
                     return Err(error);
                 }
             }
+            #[cfg(windows)]
+            if !nddev_clipboard_platform::is_unix_socket(path)? {
+                return Err(error);
+            }
             match Stream::connect(path) {
                 Ok(_) => Err(error), // Never unlink another live daemon.
                 Err(probe) if probe.kind() == io::ErrorKind::ConnectionRefused => {
@@ -212,5 +216,40 @@ mod tests {
         assert!(bind_at(&path).is_err());
         assert_eq!(std::fs::read(&path).unwrap(), b"keep");
         std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn an_occupied_directory_is_never_removed() {
+        let path = path();
+        std::fs::create_dir(&path).unwrap();
+        let content = path.join("keep");
+        std::fs::write(&content, b"retained directory content").unwrap();
+        assert!(bind_at(&path).is_err());
+        assert_eq!(
+            std::fs::read(content).unwrap(),
+            b"retained directory content"
+        );
+        std::fs::remove_dir_all(path).unwrap();
+    }
+
+    #[test]
+    fn a_link_to_a_dead_socket_is_never_removed_or_followed() {
+        let endpoint = path();
+        let link = path();
+        drop(bind_at(&endpoint).unwrap());
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&endpoint, &link).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_file(&endpoint, &link).unwrap();
+        assert!(bind_at(&link).is_err());
+        assert!(
+            std::fs::symlink_metadata(&link)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+        assert!(std::fs::symlink_metadata(&endpoint).is_ok());
+        std::fs::remove_file(link).unwrap();
+        std::fs::remove_file(endpoint).unwrap();
     }
 }
