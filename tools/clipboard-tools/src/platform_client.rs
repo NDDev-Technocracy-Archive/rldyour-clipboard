@@ -48,12 +48,17 @@ pub(crate) fn qualify(root: &Path) -> Result<()> {
         return Err("unexpected platform-client argument".into());
     }
     #[cfg(unix)]
-    let parent = Path::new("/tmp").to_path_buf();
+    let parent = Path::new("/tmp").canonicalize()?;
     #[cfg(windows)]
     let parent = std::env::temp_dir();
-    let directory = tempfile::Builder::new()
-        .prefix("cb-client-")
-        .tempdir_in(parent)?;
+    let mut builder = tempfile::Builder::new();
+    builder.prefix("cb-client-");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        builder.permissions(std::fs::Permissions::from_mode(0o700));
+    }
+    let directory = builder.tempdir_in(parent)?;
     // Build from this checked source and consume Cargo's actual artifact path.
     // An installed or caller-supplied old daemon might ignore the new profile.
     let daemon = build_daemon(root, directory.path())?;
