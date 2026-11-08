@@ -1,5 +1,5 @@
 [workspace]
-members = ["daemon", "crates/api", "tools/clipboard-tools"]
+members = ["daemon", "crates/api", "crates/sdk", "tools/clipboard-tools"]
 resolver = "3"
 
 [workspace.package]
@@ -19,6 +19,7 @@ thiserror = "=2.0.21"
 utoipa = "=6.0.0"
 sha2 = "0.11"
 nddev-clipboard-api = { path = "crates/api" }
+nddev-clipboard-sdk = { path = "crates/sdk" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

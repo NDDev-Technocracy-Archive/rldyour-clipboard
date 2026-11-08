@@ -1,0 +1,118 @@
+//! Adversarial peers exercise framing and connection reuse, never an OS clipboard.
+use nddev_clipboard_api::wire::{MAX_FRAME, Role};
+use nddev_clipboard_sdk::{Client, Error};
+use std::io::{self, Cursor, Read, Write};
+
+struct Peer {
+    input: Cursor<Vec<u8>>,
+    output: Vec<u8>,
+}
+impl Read for Peer {
+    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+        self.input.read(bytes)
+    }
+}
+impl Write for Peer {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.output.write(bytes)
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+fn client(responses: &[u8]) -> Client<Peer> {
+    let mut input =
+        br#"{"ev":"hello","v":1,"entries":0,"bytes":0,"budget":1024,"retention_days":null}"#
+            .to_vec();
+    input.push(b'\n');
+    input.extend_from_slice(responses);
+    Client::new(
+        Peer {
+            input: Cursor::new(input),
+            output: Vec::new(),
+        },
+        Role::Both,
+    )
+    .unwrap()
+}
+
+#[test]
+fn prefetched_binary_and_the_next_control_frame_keep_their_boundaries() {
+    let mut responses =
+        br#"{"ev":"blob","req":1,"mime":"application/octet-stream","bytes":4}"#.to_vec();
+    responses.extend_from_slice(&[b'\n', 0xff, b'\n', 0, 3]);
+    responses.extend_from_slice(b"{\"ev\":\"ok\",\"req\":2}\n");
+    let mut client = client(&responses);
+    let mut payload = Vec::new();
+    let blob = client
+        .fetch_to(i64::MAX, None, false, &mut payload)
+        .unwrap();
+    assert_eq!(payload, [0xff, b'\n', 0, 3]);
+    assert_eq!(blob.mime, "application/octet-stream");
+    assert_eq!(blob.bytes, 4);
+    client.pin(i64::MAX, true).unwrap();
+}
+
+#[test]
+fn an_oversized_or_unterminated_frame_invalidates_the_connection() {
+    for response in [
+        vec![b' '; MAX_FRAME + 1],
+        b"{\"ev\":\"ok\",\"req\":1}".to_vec(),
+    ] {
+        let mut client = client(&response);
+        assert!(matches!(client.pin(1, true), Err(Error::InvalidFrame)));
+        assert!(matches!(client.pin(1, true), Err(Error::Closed)));
+    }
+}
+
+#[test]
+fn a_mismatched_request_or_response_invalidates_the_connection() {
+    for response in [
+        b"{\"ev\":\"ok\",\"req\":2}\n".as_slice(),
+        b"{\"ev\":\"blob\",\"req\":1,\"mime\":\"text/plain\",\"bytes\":8}\npayload!\n",
+    ] {
+        let mut client = client(response);
+        assert!(matches!(
+            client.pin(1, true),
+            Err(Error::UnexpectedResponse)
+        ));
+        assert!(matches!(client.pin(1, true), Err(Error::Closed)));
+    }
+}
+
+#[test]
+fn a_matching_remote_error_does_not_desynchronize_a_later_request() {
+    let mut client = client(b"{\"ev\":\"error\",\"req\":1,\"code\":\"future-code\",\"message\":\"unused\"}\n{\"ev\":\"ok\",\"req\":2}\n");
+    assert!(matches!(client.pin(1, true), Err(Error::Remote { code }) if code == "future-code"));
+    client.pin(2, true).unwrap();
+}
+
+#[test]
+fn incomplete_incoming_and_outgoing_payloads_prevent_reuse() {
+    let mut incoming =
+        client(b"{\"ev\":\"blob\",\"req\":1,\"mime\":\"text/plain\",\"bytes\":8}\nshort");
+    assert!(matches!(
+        incoming.fetch_to(1, None, false, &mut Vec::new()),
+        Err(Error::TruncatedPayload)
+    ));
+    assert!(matches!(incoming.pin(1, true), Err(Error::Closed)));
+
+    let mut outgoing = client(b"{\"ev\":\"begin\",\"req\":1,\"draft\":1}\n");
+    let draft = outgoing.begin(None).unwrap();
+    assert!(matches!(
+        outgoing.part_from(draft, "text/plain", 8, &mut b"short".as_slice()),
+        Err(Error::TruncatedPayload)
+    ));
+    assert!(matches!(outgoing.commit(draft), Err(Error::Closed)));
+}
+
+#[test]
+fn a_large_query_is_rejected_before_any_request_bytes_are_written() {
+    let mut client = client(b"{\"ev\":\"ok\",\"req\":1}\n");
+    assert!(matches!(
+        client.list(10, None, Some(&"x".repeat(MAX_FRAME)), None),
+        Err(Error::InvalidFrame)
+    ));
+    client.pin(1, true).unwrap();
+}

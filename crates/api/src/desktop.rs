@@ -59,7 +59,7 @@ mod tests {
     fn desktop_keys_preserve_the_entire_archive_identifier() {
         let summary = crate::wire::Summary {
             id: i64::MAX,
-            kind: "text",
+            kind: "text".into(),
             mimes: vec!["text/plain".into()],
             bytes: 1,
             preview: None,

@@ -246,3 +246,74 @@ fn one_archive_owner_preserves_pins_and_bytes_through_an_abrupt_restart() {
     peer.0.read_exact(&mut bytes).unwrap();
     assert_eq!(bytes, b"synthetic durable content");
 }
+
+#[test]
+fn the_rust_sdk_streams_real_multiformat_entries_and_recovers_from_a_refused_request() {
+    use nddev_clipboard_api::wire::Role;
+    use nddev_clipboard_sdk::{Client, Error};
+
+    let fixture = Fixture::new();
+    let profile = fixture.profile("clipboard.toml", "archive", "sdk.sock");
+    let endpoint = fixture.0.join("sdk.sock");
+    let (_daemon, _peer) = Daemon::start(&profile, &endpoint);
+    let stream = Stream::connect(endpoint).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
+    stream
+        .set_write_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
+    let mut client = Client::new(stream, Role::Both).unwrap();
+    assert!(client.list(10, None, None, None).unwrap().items.is_empty());
+
+    let payload: Vec<u8> = (0..=255).cycle().take(3 * 1024 * 1024).collect();
+    let html = b"<p>Isolated SDK fixture</p>";
+    let draft = client.begin(Some("SDK qualification")).unwrap();
+    client
+        .part_from(
+            draft,
+            "application/octet-stream",
+            payload.len() as u64,
+            &mut payload.as_slice(),
+        )
+        .unwrap();
+    client
+        .part_from(draft, "text/html", html.len() as u64, &mut html.as_slice())
+        .unwrap();
+    let entry = client.commit(draft).unwrap();
+    client.pin(entry, true).unwrap();
+    let page = client.list(10, None, None, Some(true)).unwrap();
+    assert_eq!(page.items.len(), 1);
+    assert_eq!(page.items[0].id, entry);
+    assert_eq!(page.items[0].mimes.len(), 2);
+    assert!(!page.more);
+
+    let mut restored = Vec::new();
+    let blob = client
+        .fetch_to(
+            entry,
+            Some("application/octet-stream"),
+            false,
+            &mut restored,
+        )
+        .unwrap();
+    assert_eq!(blob.bytes, payload.len() as u64);
+    assert_eq!(blob.mime, "application/octet-stream");
+    assert_eq!(restored, payload);
+    restored.clear();
+    client
+        .fetch_to(entry, Some("text/html"), false, &mut restored)
+        .unwrap();
+    assert_eq!(restored, html);
+    assert!(
+        matches!(client.pin(i64::MAX, true), Err(Error::Remote { code }) if code == "no-such-entry")
+    );
+    assert_eq!(
+        client.list(10, None, None, Some(true)).unwrap().items[0].id,
+        entry
+    );
+
+    let discarded = client.begin(None).unwrap();
+    client.abort(discarded).unwrap();
+    assert_eq!(client.list(10, None, None, None).unwrap().items.len(), 1);
+}

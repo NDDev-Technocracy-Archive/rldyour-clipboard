@@ -41,7 +41,7 @@ impl Role {
     }
 }
 
-#[derive(Debug, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(tag = "op", rename_all = "lowercase")]
 pub enum Request {
     Hello {
@@ -155,10 +155,10 @@ impl Request {
 }
 
 /// What the UI needs to draw one archive entry without fetching its content.
-#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
 pub struct Summary {
     pub id: i64,
-    pub kind: &'static str,
+    pub kind: String,
     pub mimes: Vec<String>,
     pub bytes: i64,
     pub preview: Option<String>,
@@ -170,7 +170,7 @@ pub struct Summary {
     pub at: i64,
 }
 
-#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(tag = "ev", rename_all = "lowercase")]
 pub enum Response {
     Hello {
@@ -238,7 +238,7 @@ pub enum Response {
     Error {
         #[serde(skip_serializing_if = "Option::is_none")]
         req: Option<u64>,
-        code: &'static str,
+        code: String,
         message: String,
     },
 }
@@ -259,7 +259,7 @@ impl Response {
     pub fn error(req: Option<u64>, code: &'static str, message: impl Into<String>) -> Self {
         Response::Error {
             req,
-            code,
+            code: code.to_owned(),
             message: message.into(),
         }
     }

@@ -396,6 +396,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nddev-clipboard-sdk"
+version = "0.2.2"
+dependencies = [
+ "nddev-clipboard-api",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "num-traits"
 version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -508,6 +517,7 @@ dependencies = [
  "image",
  "libc",
  "nddev-clipboard-api",
+ "nddev-clipboard-sdk",
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",

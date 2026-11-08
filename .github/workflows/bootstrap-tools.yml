@@ -29,11 +29,11 @@ jobs:
           components: rustfmt,clippy
           cache: false
       - name: Check the independent configuration contract
-        run: cargo test --locked -p nddev-clipboard-api
+        run: cargo test --locked -p nddev-clipboard-api -p nddev-clipboard-sdk
       - name: Compile the source verifier and produce its schema
         shell: bash
         run: |
-          cargo clippy --locked -p nddev-clipboard-api -p clipboard-tools --all-targets -- -D warnings
+          cargo clippy --locked -p nddev-clipboard-api -p nddev-clipboard-sdk -p clipboard-tools --all-targets -- -D warnings
           cargo build --locked -p clipboard-tools
           target/debug/clipboard-tools generate
       - name: Prepare the source verifier artifact
@@ -57,4 +57,5 @@ jobs:
       - name: Qualify the configured daemon
         run: |
           cargo clippy --locked -p rldyour-clipboardd --all-targets --all-features -- -D warnings
+          cargo test --locked -p rldyour-clipboardd --test profile_lifecycle --all-features
           cargo test --locked -p rldyour-clipboardd --all-features

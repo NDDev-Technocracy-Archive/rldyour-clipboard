@@ -621,7 +621,8 @@ fn read_summary(row: &rusqlite::Row<'_>) -> rusqlite::Result<Summary> {
         id: row.get(0)?,
         kind: Kind::parse(&row.get::<_, String>(1)?)
             .unwrap_or(Kind::Text)
-            .as_str(),
+            .as_str()
+            .to_owned(),
         // Filled by the caller, which holds the statement this row came from.
         mimes: Vec::new(),
         bytes: row.get(2)?,
