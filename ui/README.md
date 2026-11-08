@@ -28,3 +28,9 @@ no dependency files or shared package store are edited.
 Run source checks with `bun run check`. Build and run browser tests only on an execution host or
 runner: `bun run build:preview` and `bun run test`. Every test worker binds its temporary static
 server to an OS-assigned loopback port and closes it after the suite.
+
+For a manual browser review on an execution host, build the preview and run `bun run preview`.
+It uses the same static server as the acceptance suite, prints its OS-assigned loopback URL,
+and stops on Ctrl+C. The page uses synthetic records. Query parameters select `language`,
+`theme`, `empty` and `failure` states. Close the owned browser session and stop the server after
+review; do not start it on a source-only host.

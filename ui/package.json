@@ -33,6 +33,7 @@
     "build:preview": "bun build ./preview/index.html --outdir ./dist-preview --target browser --minify",
     "check": "biome check src preview tests locales *.json && oxlint --type-aware src preview && knip && bunx --no-install --package @typescript/native tsc --noEmit",
     "generate": "openapi-ts --input ../contracts/local-ipc.openapi.json --output generated/api --plugins @hey-api/typescript",
+    "preview": "bun ./preview/server.ts",
     "test": "playwright test"
   },
   "type": "module",

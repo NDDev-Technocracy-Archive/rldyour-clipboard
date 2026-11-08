@@ -1,49 +1,15 @@
-import { readFile } from "node:fs/promises";
-import { createServer, type Server } from "node:http";
-import { extname, resolve, sep } from "node:path";
 import { expect, test } from "@playwright/test";
+import { createPreviewServer } from "../preview/server";
 import { resources } from "../src/localization";
 
-let server: Server;
+let server: Awaited<ReturnType<typeof createPreviewServer>> | undefined;
 let address: string;
 test.beforeAll(async () => {
-  const root = resolve("dist-preview");
-  const types: Record<string, string> = {
-    ".html": "text/html",
-    ".js": "text/javascript",
-    ".css": "text/css",
-    ".svg": "image/svg+xml",
-    ".woff2": "font/woff2",
-  };
-  server = createServer(async (request, response) => {
-    try {
-      const name = decodeURIComponent(
-        new URL(request.url ?? "/", "http://localhost").pathname,
-      );
-      const path = resolve(root, `.${name === "/" ? "/index.html" : name}`);
-      if (!path.startsWith(root + sep)) {
-        response.writeHead(400).end();
-        return;
-      }
-      response.setHeader(
-        "Content-Type",
-        types[extname(path)] ?? "application/octet-stream",
-      );
-      response.end(await readFile(path));
-    } catch {
-      response.writeHead(404).end();
-    }
-  });
-  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
-  const location = server.address();
-  if (!location || typeof location === "string")
-    throw new Error("No isolated listener");
-  address = `http://127.0.0.1:${location.port}`;
+  server = await createPreviewServer();
+  address = server.url;
 });
 test.afterAll(async () => {
-  await new Promise<void>((done, reject) =>
-    server.close((error) => (error ? reject(error) : done())),
-  );
+  if (server) await server.close();
 });
 
 for (const language of ["ru", "en", "kk", "ar", "zh"] as const) {
