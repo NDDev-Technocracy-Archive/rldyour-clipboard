@@ -24,13 +24,13 @@ const COPY_BUFFER: usize = 64 * 1024;
 /// with a very long archive.
 const FANOUT: usize = 2;
 
-pub struct Blobs {
+pub(crate) struct Blobs {
     root: PathBuf,
     leases: Arc<Mutex<HashMap<String, usize>>>,
 }
 
-pub struct ScratchFile {
-    pub file: File,
+pub(crate) struct ScratchFile {
+    pub(crate) file: File,
     path: PathBuf,
 }
 impl Drop for ScratchFile {
@@ -42,7 +42,7 @@ impl Drop for ScratchFile {
 /// A draft's published blob cannot be collected before its index commit.
 /// The same gate serialises file publication with removal, so a re-copy and
 /// an expiry sweep cannot unlink each other's content-addressed file.
-pub struct Lease {
+pub(crate) struct Lease {
     digest: String,
     registry: Arc<Mutex<HashMap<String, usize>>>,
 }
@@ -61,20 +61,20 @@ impl Drop for Lease {
 }
 
 /// What a completed streaming write turned out to be.
-pub struct Written {
-    pub digest: String,
-    pub bytes: u64,
-    pub lease: Lease,
+pub(crate) struct Written {
+    pub(crate) digest: String,
+    pub(crate) bytes: u64,
+    pub(crate) lease: Lease,
     /// False when a blob with this digest was already stored, which is the
     /// common case for a clipboard that is re-asserted unchanged. Nothing acts
     /// on it yet; it is here because a write that stored nothing is a
     /// materially different outcome from one that did.
     #[cfg_attr(not(test), allow(dead_code))]
-    pub created: bool,
+    pub(crate) created: bool,
 }
 
 impl Blobs {
-    pub fn open(root: PathBuf) -> io::Result<Self> {
+    pub(crate) fn open(root: PathBuf) -> io::Result<Self> {
         crate::storage_fs::private_dir(&root)?;
         crate::storage_fs::private_dir(&root.join("incoming"))?;
         Ok(Self {
@@ -96,17 +96,17 @@ impl Blobs {
     /// Whether the store already holds this content. Used by the tests and by
     /// the startup reconciliation, both of which compare disk against index.
     #[cfg(test)]
-    pub fn exists(&self, digest: &str) -> bool {
+    pub(crate) fn exists(&self, digest: &str) -> bool {
         self.path(digest).is_ok_and(|path| path.exists())
     }
 
-    pub fn open_read(&self, digest: &str) -> io::Result<File> {
+    pub(crate) fn open_read(&self, digest: &str) -> io::Result<File> {
         let mut options = fs::OpenOptions::new();
         options.read(true);
         crate::storage_fs::private_open(&self.path(digest)?, &mut options)
     }
 
-    pub fn sync_pinned(&self, digest: &str) -> io::Result<()> {
+    pub(crate) fn sync_pinned(&self, digest: &str) -> io::Result<()> {
         let path = self.path(digest)?;
         // Flush file content without reading clipboard payloads, then persist
         // its published directory entries on POSIX before the durable pin.
@@ -118,7 +118,7 @@ impl Blobs {
     }
 
     /// Private transient output, never published into the archive/index.
-    pub fn scratch(&self) -> io::Result<ScratchFile> {
+    pub(crate) fn scratch(&self) -> io::Result<ScratchFile> {
         let path = self.root.join("incoming").join(temporary_name());
         let mut options = fs::OpenOptions::new();
         options.read(true).write(true).create_new(true);
@@ -133,7 +133,7 @@ impl Blobs {
     /// the stream carries the frames that follow as well: reading to the end
     /// would consume the rest of the connection. A source that ends early is
     /// an error and leaves nothing behind.
-    pub fn write_from(&self, source: &mut impl Read, bytes: u64) -> io::Result<Written> {
+    pub(crate) fn write_from(&self, source: &mut impl Read, bytes: u64) -> io::Result<Written> {
         let mut writer = self.writer()?;
         writer.absorb(source, bytes)?;
         writer.finish()
@@ -146,7 +146,7 @@ impl Blobs {
     /// buffering the whole thing -- which is the one cost this design exists
     /// to avoid. This lets it feed what it has as it arrives and still pay one
     /// pass and one hash.
-    pub fn writer(&self) -> io::Result<Writer<'_>> {
+    pub(crate) fn writer(&self) -> io::Result<Writer<'_>> {
         let incoming = self.root.join("incoming").join(temporary_name());
         let mut options = fs::OpenOptions::new();
         options.write(true).create_new(true);
@@ -162,11 +162,11 @@ impl Blobs {
 
     /// Stores a blob already held in memory. Only thumbnails take this path;
     /// clipboard content never does.
-    pub fn write_bytes(&self, content: &[u8]) -> io::Result<Written> {
+    pub(crate) fn write_bytes(&self, content: &[u8]) -> io::Result<Written> {
         self.write_from(&mut io::Cursor::new(content), content.len() as u64)
     }
 
-    pub fn remove(&self, digest: &str) -> io::Result<bool> {
+    pub(crate) fn remove(&self, digest: &str) -> io::Result<bool> {
         let leases = self
             .leases
             .lock()
@@ -187,7 +187,7 @@ impl Blobs {
 
     /// Clears temporaries left by a process that died mid-transfer. Called at
     /// startup, when nothing else can be writing them.
-    pub fn sweep_incoming(&self) -> io::Result<()> {
+    pub(crate) fn sweep_incoming(&self) -> io::Result<()> {
         for entry in fs::read_dir(self.root.join("incoming"))? {
             let _ = fs::remove_file(entry?.path());
         }
@@ -201,7 +201,7 @@ impl Blobs {
 /// single pass that stored it. Dropped without finishing, it removes its own
 /// temporary: a partial blob would hash to something plausible and be served
 /// later as if it were whole.
-pub struct Writer<'a> {
+pub(crate) struct Writer<'a> {
     blobs: &'a Blobs,
     file: Option<File>,
     hasher: Sha256,
@@ -211,7 +211,7 @@ pub struct Writer<'a> {
 
 impl Writer<'_> {
     /// Copies exactly `bytes` more from `source` into the blob.
-    pub fn absorb(&mut self, source: &mut impl Read, bytes: u64) -> io::Result<()> {
+    pub(crate) fn absorb(&mut self, source: &mut impl Read, bytes: u64) -> io::Result<()> {
         let Some(file) = self.file.as_mut() else {
             return Err(io::Error::other("this blob has already been finished"));
         };
@@ -239,12 +239,12 @@ impl Writer<'_> {
 
     /// How much has been absorbed so far, so a caller can enforce a budget
     /// against a stream that never declared its length.
-    pub fn written(&self) -> u64 {
+    pub(crate) fn written(&self) -> u64 {
         self.bytes
     }
 
     /// Seals the blob under the name its own content chose.
-    pub fn finish(mut self) -> io::Result<Written> {
+    pub(crate) fn finish(mut self) -> io::Result<Written> {
         let Some(file) = self.file.take() else {
             return Err(io::Error::other("this blob has already been finished"));
         };

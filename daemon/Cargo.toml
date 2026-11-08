@@ -52,6 +52,9 @@ thumbnails = ["dep:image"]
 [dev-dependencies]
 nddev-clipboard-sdk.workspace = true
 
+[lints]
+workspace = true
+
 # The daemon sleeps almost all of its life and wakes to copy bytes. Size and
 # residency win over throughput. `panic = "abort"` also makes a fault a clean
 # restart under the service manager rather than a half-live process holding the

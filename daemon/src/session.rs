@@ -26,7 +26,7 @@ struct Draft {
     parts: Vec<Accepted>,
 }
 
-pub struct Session {
+pub(crate) struct Session {
     store: Arc<Store>,
     out: Arc<Outbox>,
     watchers: Arc<Watchers>,
@@ -45,7 +45,7 @@ impl Drop for Session {
 }
 
 impl Session {
-    pub fn new(store: Arc<Store>, out: Arc<Outbox>, watchers: Arc<Watchers>) -> Self {
+    pub(crate) fn new(store: Arc<Store>, out: Arc<Outbox>, watchers: Arc<Watchers>) -> Self {
         Self {
             store,
             out,
@@ -57,7 +57,7 @@ impl Session {
         }
     }
 
-    pub fn watches(&self) -> bool {
+    pub(crate) fn watches(&self) -> bool {
         self.role.watches() && self.watch
     }
 
@@ -65,7 +65,7 @@ impl Session {
     ///
     /// A client that does not open with a `hello` it can be held to is not one
     /// this daemon talks to, and it is disconnected rather than corrected.
-    pub fn greet(&mut self, input: &mut impl BufRead) -> io::Result<bool> {
+    pub(crate) fn greet(&mut self, input: &mut impl BufRead) -> io::Result<bool> {
         let Some(line) = read_frame(input)? else {
             return Ok(false);
         };
@@ -100,7 +100,7 @@ impl Session {
     }
 
     /// Performs frames until the client goes away.
-    pub fn run(&mut self, input: &mut impl BufRead) -> io::Result<()> {
+    pub(crate) fn run(&mut self, input: &mut impl BufRead) -> io::Result<()> {
         while let Some(line) = read_frame(input)? {
             let request = match proto::decode(&line) {
                 Ok(request) => request,
@@ -652,7 +652,7 @@ fn too_long() -> io::Error {
 
 /// Unix seconds. A clock that cannot be read is not a reason to lose a
 /// clipboard entry, so the epoch stands in and the entry sorts oldest.
-pub fn now() -> i64 {
+pub(crate) fn now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|since| since.as_secs() as i64)

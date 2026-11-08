@@ -13,13 +13,13 @@ struct Writer {
     stream: Stream,
     frame: Vec<u8>,
 }
-pub struct Outbox {
+pub(crate) struct Outbox {
     writer: Mutex<Writer>,
     shutdown: Option<Stream>,
 }
 
 impl Outbox {
-    pub fn new(stream: Stream) -> Self {
+    pub(crate) fn new(stream: Stream) -> Self {
         let _ = stream.set_write_timeout(Some(std::time::Duration::from_secs(2)));
         let shutdown = stream.try_clone().ok();
         Self {
@@ -30,12 +30,12 @@ impl Outbox {
             shutdown,
         }
     }
-    pub fn close(&self) {
+    pub(crate) fn close(&self) {
         if let Some(stream) = &self.shutdown {
             let _ = stream.shutdown(std::net::Shutdown::Both);
         }
     }
-    pub fn send(&self, response: &Response) -> io::Result<()> {
+    pub(crate) fn send(&self, response: &Response) -> io::Result<()> {
         let mut writer = self.writer.lock().map_err(poisoned)?;
         let Writer { stream, frame } = &mut *writer;
         response.encode(frame);
@@ -47,7 +47,7 @@ impl Outbox {
         }
         stream.write_all(frame)
     }
-    pub fn send_blob(
+    pub(crate) fn send_blob(
         &self,
         response: &Response,
         content: &mut impl Read,
@@ -77,11 +77,11 @@ struct Subscriber {
 }
 type Registry = Mutex<HashMap<u64, Subscriber>>;
 #[derive(Default)]
-pub struct Watchers {
+pub(crate) struct Watchers {
     inner: Arc<Registry>,
     next: AtomicU64,
 }
-pub struct Subscription {
+pub(crate) struct Subscription {
     id: u64,
     registry: Weak<Registry>,
 }
@@ -95,7 +95,7 @@ impl Drop for Subscription {
     }
 }
 impl Watchers {
-    pub fn add(&self, out: &Arc<Outbox>) -> Option<Subscription> {
+    pub(crate) fn add(&self, out: &Arc<Outbox>) -> Option<Subscription> {
         let (queue, events) = mpsc::sync_channel::<Arc<Response>>(64);
         let weak = Arc::downgrade(out);
         std::thread::Builder::new()
@@ -124,7 +124,7 @@ impl Watchers {
             registry: Arc::downgrade(&self.inner),
         })
     }
-    pub fn broadcast(&self, event: &Response) {
+    pub(crate) fn broadcast(&self, event: &Response) {
         let Ok(mut entries) = self.inner.lock() else {
             return;
         };
@@ -141,7 +141,7 @@ impl Watchers {
         });
     }
     #[cfg(test)]
-    pub fn count(&self) -> usize {
+    pub(crate) fn count(&self) -> usize {
         self.inner
             .lock()
             .map(|entries| {

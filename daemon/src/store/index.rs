@@ -14,35 +14,35 @@ use std::path::Path;
 
 /// A representation about to be recorded.
 #[derive(Debug, Clone)]
-pub struct Part {
-    pub mime: String,
-    pub digest: String,
-    pub bytes: u64,
+pub(crate) struct Part {
+    pub(crate) mime: String,
+    pub(crate) digest: String,
+    pub(crate) bytes: u64,
 }
 
 /// Everything an entry needs beyond its parts.
 #[derive(Debug, Default)]
-pub struct Facts {
-    pub preview: Option<String>,
-    pub width: Option<u32>,
-    pub height: Option<u32>,
-    pub thumb: Option<Part>,
-    pub source: Option<String>,
+pub(crate) struct Facts {
+    pub(crate) preview: Option<String>,
+    pub(crate) width: Option<u32>,
+    pub(crate) height: Option<u32>,
+    pub(crate) thumb: Option<Part>,
+    pub(crate) source: Option<String>,
     /// Text handed to the full-text index, already capped by the caller.
-    pub body: Option<String>,
+    pub(crate) body: Option<String>,
 }
 
-pub struct Index {
+pub(crate) struct Index {
     connection: Connection,
 }
 
 /// A list request never returns more than this however much it asks for: the
 /// UI draws a window, not an archive, and an unbounded answer would be one
 /// allocation the peer chooses the size of.
-pub const MAX_LIMIT: u32 = 500;
+pub(crate) const MAX_LIMIT: u32 = 500;
 
 impl Index {
-    pub fn open(path: &Path) -> rusqlite::Result<Self> {
+    pub(crate) fn open(path: &Path) -> rusqlite::Result<Self> {
         let connection = Connection::open(path)?;
         // WAL lets the UI read while a capture writes, which is the only
         // concurrency the archive ever sees. NORMAL trades a fsync per commit
@@ -108,7 +108,7 @@ impl Index {
     /// Returns its id when the identity was already known, which is the common
     /// case: an application that re-asserts the clipboard unchanged every few
     /// seconds must not fill the archive with copies of one thing.
-    pub fn touch(&self, identity: &str, at: i64) -> rusqlite::Result<Option<i64>> {
+    pub(crate) fn touch(&self, identity: &str, at: i64) -> rusqlite::Result<Option<i64>> {
         let existing: Option<i64> = self
             .connection
             .query_row(
@@ -126,7 +126,7 @@ impl Index {
     }
 
     /// Records a new entry and every representation it holds.
-    pub fn insert(
+    pub(crate) fn insert(
         &mut self,
         identity: &str,
         parts: &[Part],
@@ -187,7 +187,7 @@ impl Index {
         Ok(id)
     }
 
-    pub fn summary(&self, id: i64) -> rusqlite::Result<Option<Summary>> {
+    pub(crate) fn summary(&self, id: i64) -> rusqlite::Result<Option<Summary>> {
         let found = self
             .connection
             .query_row(
@@ -216,7 +216,7 @@ impl Index {
     }
 
     /// Entries for one window of the UI's list, pinned first and newest first.
-    pub fn list(
+    pub(crate) fn list(
         &self,
         limit: u32,
         before: Option<i64>,
@@ -319,7 +319,7 @@ impl Index {
 
     /// The blob backing one representation, or the preferred one when no mime
     /// is named.
-    pub fn locate(
+    pub(crate) fn locate(
         &self,
         entry: i64,
         mime: Option<&str>,
@@ -350,7 +350,7 @@ impl Index {
     ///
     /// `LIKE` metacharacters in the prefix are escaped, so a lookup only ever
     /// matches a real prefix.
-    pub fn locate_prefixed(
+    pub(crate) fn locate_prefixed(
         &self,
         entry: i64,
         prefix: &str,
@@ -374,7 +374,7 @@ impl Index {
         Ok(row)
     }
 
-    pub fn thumb(&self, entry: i64) -> rusqlite::Result<Option<(String, u64)>> {
+    pub(crate) fn thumb(&self, entry: i64) -> rusqlite::Result<Option<(String, u64)>> {
         self.connection
             .query_row(
                 "SELECT b.digest, b.bytes FROM entry e JOIN blob b ON b.digest = e.thumb
@@ -385,7 +385,7 @@ impl Index {
             .optional()
     }
 
-    pub fn set_pinned(&self, entry: i64, pinned: bool) -> rusqlite::Result<bool> {
+    pub(crate) fn set_pinned(&self, entry: i64, pinned: bool) -> rusqlite::Result<bool> {
         // Pinning is infrequent and explicitly durable: sync this commit's
         // WAL rather than paying FULL fsync for every ordinary clipboard copy.
         if pinned {
@@ -402,7 +402,7 @@ impl Index {
         changed.map(|changed| changed > 0)
     }
 
-    pub fn entry_digests(&self, entry: i64) -> rusqlite::Result<Vec<String>> {
+    pub(crate) fn entry_digests(&self, entry: i64) -> rusqlite::Result<Vec<String>> {
         let mut query = self.connection.prepare(
             "SELECT digest FROM part WHERE entry = ?1
              UNION SELECT thumb FROM entry WHERE id = ?1 AND thumb IS NOT NULL",
@@ -411,7 +411,7 @@ impl Index {
     }
 
     /// Deletes one entry, returning the digests no record points at any more.
-    pub fn remove(&mut self, entry: i64) -> rusqlite::Result<Vec<String>> {
+    pub(crate) fn remove(&mut self, entry: i64) -> rusqlite::Result<Vec<String>> {
         let transaction = self.connection.transaction()?;
         let orphaned = release_entry(&transaction, entry)?;
         let existed = transaction.execute("DELETE FROM entry WHERE id = ?1", params![entry])?;
@@ -426,7 +426,7 @@ impl Index {
     }
 
     /// Deletes everything not pinned.
-    pub fn clear(&mut self) -> rusqlite::Result<Vec<String>> {
+    pub(crate) fn clear(&mut self) -> rusqlite::Result<Vec<String>> {
         let transaction = self.connection.transaction()?;
         let doomed: Vec<i64> = {
             let mut statement = transaction.prepare("SELECT id FROM entry WHERE pinned = 0")?;
@@ -448,7 +448,7 @@ impl Index {
     ///
     /// Returns the orphaned digests and the ids that were removed, so the
     /// daemon can tell watching clients what disappeared under them.
-    pub fn evict_to(&mut self, budget: i64) -> rusqlite::Result<(Vec<String>, Vec<i64>)> {
+    pub(crate) fn evict_to(&mut self, budget: i64) -> rusqlite::Result<(Vec<String>, Vec<i64>)> {
         let mut used = self.bytes()?;
         if used <= budget {
             return Ok((Vec::new(), Vec::new()));
@@ -490,7 +490,7 @@ impl Index {
     /// One bounded indexed expiry transaction; pinned rows never qualify.
     /// Repeated passes yield the index lock between batches rather than
     /// blocking search for an entire large archive.
-    pub fn expire_before(
+    pub(crate) fn expire_before(
         &mut self,
         cutoff: i64,
         batch: u32,
@@ -514,7 +514,7 @@ impl Index {
         Ok((orphaned, entries))
     }
 
-    pub fn references(&self, digest: &str) -> rusqlite::Result<bool> {
+    pub(crate) fn references(&self, digest: &str) -> rusqlite::Result<bool> {
         self.connection.query_row(
             "SELECT EXISTS(SELECT 1 FROM blob WHERE digest = ?1 AND refs > 0)",
             [digest],
@@ -522,21 +522,21 @@ impl Index {
         )
     }
 
-    pub fn entries(&self) -> rusqlite::Result<i64> {
+    pub(crate) fn entries(&self) -> rusqlite::Result<i64> {
         self.connection
             .query_row("SELECT COUNT(*) FROM entry", [], |row| row.get(0))
     }
 
     /// How many entries are pinned — the favourites that eviction never
     /// touches.
-    pub fn pinned(&self) -> rusqlite::Result<i64> {
+    pub(crate) fn pinned(&self) -> rusqlite::Result<i64> {
         self.connection
             .query_row("SELECT COUNT(*) FROM entry WHERE pinned = 1", [], |row| {
                 row.get(0)
             })
     }
 
-    pub fn bytes(&self) -> rusqlite::Result<i64> {
+    pub(crate) fn bytes(&self) -> rusqlite::Result<i64> {
         self.connection
             .query_row("SELECT COALESCE(SUM(bytes), 0) FROM blob", [], |row| {
                 row.get(0)
@@ -544,7 +544,7 @@ impl Index {
     }
 
     /// Digests the index knows about, for reconciling against the disk.
-    pub fn known_digests(&self) -> rusqlite::Result<Vec<String>> {
+    pub(crate) fn known_digests(&self) -> rusqlite::Result<Vec<String>> {
         let mut statement = self.connection.prepare("SELECT digest FROM blob")?;
         let rows = statement.query_map([], |row| row.get(0))?;
         rows.collect()

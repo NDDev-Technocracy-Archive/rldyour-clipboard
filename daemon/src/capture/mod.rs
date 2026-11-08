@@ -33,7 +33,7 @@ mod x11;
 ///
 /// Returns whether a watcher was started, which is only used to say so in the
 /// log: a platform without one is the expected state, not a degraded one.
-pub fn spawn(store: Arc<Store>, watchers: Arc<Watchers>) -> bool {
+pub(crate) fn spawn(store: Arc<Store>, watchers: Arc<Watchers>) -> bool {
     // On Linux the X11 watcher is only worth starting when an X server is
     // actually reachable — a Wayland-only session has no `DISPLAY`, and there
     // the extension is the capture path by design.
@@ -118,7 +118,7 @@ fn watch(_: &Recorder, _: Startup) {}
     not(any(target_os = "linux", target_os = "macos", target_os = "windows")),
     allow(dead_code)
 )]
-pub struct Recorder {
+pub(crate) struct Recorder {
     store: Arc<Store>,
     watchers: Arc<Watchers>,
 }
@@ -133,7 +133,7 @@ impl Recorder {
     /// Secrets and empty events are dropped by the store, so a backend can
     /// pass on whatever the platform offered without deciding anything.
     #[cfg(not(target_os = "macos"))]
-    pub fn record(&self, parts: Vec<(String, Vec<u8>)>, source: Option<&str>) {
+    pub(crate) fn record(&self, parts: Vec<(String, Vec<u8>)>, source: Option<&str>) {
         self.record_borrowed(
             parts
                 .iter()
@@ -143,7 +143,7 @@ impl Recorder {
     }
 
     #[cfg(not(target_os = "macos"))]
-    pub fn record_borrowed<'a>(
+    pub(crate) fn record_borrowed<'a>(
         &self,
         parts: impl IntoIterator<Item = (&'a str, &'a [u8])>,
         source: Option<&str>,
@@ -156,7 +156,7 @@ impl Recorder {
         );
     }
 
-    pub fn record_readers<'a, R: std::io::Read>(
+    pub(crate) fn record_readers<'a, R: std::io::Read>(
         &self,
         parts: impl IntoIterator<Item = (&'a str, R, u64)>,
         source: Option<&str>,

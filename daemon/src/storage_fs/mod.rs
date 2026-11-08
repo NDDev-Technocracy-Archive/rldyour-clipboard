@@ -14,7 +14,7 @@ use unix as platform;
 #[cfg(windows)]
 use windows as platform;
 
-pub fn plain(path: &Path) -> io::Result<()> {
+pub(crate) fn plain(path: &Path) -> io::Result<()> {
     if !path.is_absolute() {
         return Err(io::Error::other("absolute archive path required"));
     }
@@ -50,11 +50,11 @@ pub fn plain(path: &Path) -> io::Result<()> {
     }
     Ok(())
 }
-pub fn private_dir(path: &Path) -> io::Result<()> {
+pub(crate) fn private_dir(path: &Path) -> io::Result<()> {
     plain(path)?;
     platform::private_dir(path)
 }
-pub fn regular(path: &Path) -> io::Result<()> {
+pub(crate) fn regular(path: &Path) -> io::Result<()> {
     plain(path)?;
     match fs::symlink_metadata(path) {
         Ok(md) if !md.is_file() => Err(io::Error::other("archive file must be regular")),
@@ -63,23 +63,23 @@ pub fn regular(path: &Path) -> io::Result<()> {
         Err(e) => Err(e),
     }
 }
-pub fn private_open(path: &Path, options: &mut OpenOptions) -> io::Result<File> {
+pub(crate) fn private_open(path: &Path, options: &mut OpenOptions) -> io::Result<File> {
     regular(path)?;
     platform::open_options(options);
     options.open(path)
 }
-pub fn sync_parent(path: &Path) -> io::Result<()> {
+pub(crate) fn sync_parent(path: &Path) -> io::Result<()> {
     let parent = path
         .parent()
         .ok_or_else(|| io::Error::other("missing archive parent"))?;
     plain(parent)?;
     platform::sync_dir(parent)
 }
-pub fn sync_directory(path: &Path) -> io::Result<()> {
+pub(crate) fn sync_directory(path: &Path) -> io::Result<()> {
     plain(path)?;
     platform::sync_dir(path)
 }
-pub fn sync_file(path: &Path) -> io::Result<()> {
+pub(crate) fn sync_file(path: &Path) -> io::Result<()> {
     regular(path)?;
     platform::sync_file(path)
 }

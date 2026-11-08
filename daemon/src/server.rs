@@ -12,7 +12,7 @@ const SESSION_STACK: usize = 256 * 1024;
 const MAX_CONNECTIONS: usize = 32;
 pub(crate) static CONNECTED: AtomicUsize = AtomicUsize::new(0);
 
-pub fn run(config: nddev_clipboard_api::Config) -> std::io::Result<()> {
+pub(crate) fn run(config: nddev_clipboard_api::Config) -> std::io::Result<()> {
     let inherited = crate::net::inherited(config.socket_path())?;
     let root = config.archive_dir();
     let store = Arc::new(

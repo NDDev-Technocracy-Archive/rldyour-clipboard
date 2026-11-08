@@ -27,7 +27,7 @@
     "oxlint-tsgolint": "7.0.2005",
     "typescript": "6.0.3",
     "@typescript/native": "npm:typescript@7.0.2",
-    "@types/node": "24.19.2"
+    "@types/node": "26.6.6"
   },
   "packageExtensions": {
     "i18next-icu": {

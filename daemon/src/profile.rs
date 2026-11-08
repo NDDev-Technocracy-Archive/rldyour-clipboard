@@ -9,11 +9,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 #[derive(Default)]
 pub(crate) struct Initialization {
-    pub archive: Option<PathBuf>,
-    pub socket: Option<PathBuf>,
-    pub budget: Option<u64>,
-    pub retention: Option<u32>,
-    pub capture: Option<bool>,
+    pub(crate) archive: Option<PathBuf>,
+    pub(crate) socket: Option<PathBuf>,
+    pub(crate) budget: Option<u64>,
+    pub(crate) retention: Option<u32>,
+    pub(crate) capture: Option<bool>,
 }
 
 impl Initialization {

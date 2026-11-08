@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
-pub fn expire(store: &Store, watchers: &Watchers, retention: Option<i64>) {
+pub(crate) fn expire(store: &Store, watchers: &Watchers, retention: Option<i64>) {
     let Some(seconds) = retention else { return };
     let cutoff = crate::session::now().saturating_sub(seconds);
     // At most 1024 rows per wake. Large old archives drain incrementally so
@@ -32,7 +32,12 @@ pub fn expire(store: &Store, watchers: &Watchers, retention: Option<i64>) {
     }
 }
 
-pub fn spawn(store: Arc<Store>, watchers: Arc<Watchers>, retention: Option<i64>, idle_exit: bool) {
+pub(crate) fn spawn(
+    store: Arc<Store>,
+    watchers: Arc<Watchers>,
+    retention: Option<i64>,
+    idle_exit: bool,
+) {
     if retention.is_none() && !idle_exit {
         return;
     }

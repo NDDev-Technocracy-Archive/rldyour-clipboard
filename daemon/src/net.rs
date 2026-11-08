@@ -6,19 +6,19 @@
 use std::io;
 
 #[cfg(unix)]
-pub use std::os::unix::net::{UnixListener as Listener, UnixStream as Stream};
+pub(crate) use std::os::unix::net::{UnixListener as Listener, UnixStream as Stream};
 #[cfg(windows)]
-pub use uds_windows::{UnixListener as Listener, UnixStream as Stream};
+pub(crate) use uds_windows::{UnixListener as Listener, UnixStream as Stream};
 
-pub struct BoundListener {
-    pub listener: Listener,
-    pub activated: bool,
-    pub pending: Option<Stream>,
+pub(crate) struct BoundListener {
+    pub(crate) listener: Listener,
+    pub(crate) activated: bool,
+    pub(crate) pending: Option<Stream>,
 }
 
 /// Inspect existing activation authority before opening an archive. This never
 /// creates an endpoint or reads a pending client's control/content bytes.
-pub fn inherited(path: &std::path::Path) -> io::Result<Option<BoundListener>> {
+pub(crate) fn inherited(path: &std::path::Path) -> io::Result<Option<BoundListener>> {
     #[cfg(unix)]
     if let Some(inherited) = nddev_clipboard_platform::inherited_listener(path)? {
         return Ok(Some(BoundListener {
@@ -33,7 +33,7 @@ pub fn inherited(path: &std::path::Path) -> io::Result<Option<BoundListener>> {
 }
 
 /// Publish a self-bound endpoint only after the caller owns its archive lease.
-pub fn bind(path: &std::path::Path) -> std::io::Result<BoundListener> {
+pub(crate) fn bind(path: &std::path::Path) -> std::io::Result<BoundListener> {
     let parent = path
         .parent()
         .ok_or_else(|| io::Error::other("socket has no parent"))?;

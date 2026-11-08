@@ -11,7 +11,7 @@
 /// A list row draws at roughly ninety logical pixels; this covers that at a
 /// 2x scale factor with room to spare, and still encodes to a few kilobytes.
 #[cfg(feature = "thumbnails")]
-pub const EDGE: u32 = 256;
+pub(crate) const EDGE: u32 = 256;
 
 /// Refuse to decode an image with more pixels than this.
 ///
@@ -23,11 +23,11 @@ const MAX_PIXELS: u64 = 16_000_000;
 
 /// What could be learned about an image representation.
 #[derive(Debug, Default, PartialEq, Eq)]
-pub struct Thumbnail {
-    pub width: Option<u32>,
-    pub height: Option<u32>,
+pub(crate) struct Thumbnail {
+    pub(crate) width: Option<u32>,
+    pub(crate) height: Option<u32>,
     /// An encoded PNG, or `None` when one could not be produced.
-    pub png: Option<Vec<u8>>,
+    pub(crate) png: Option<Vec<u8>>,
 }
 
 /// Reads an image's dimensions and renders a thumbnail of it.
@@ -36,7 +36,7 @@ pub struct Thumbnail {
 /// thumbnail, and the UI draws a kind icon instead. A corrupt or hostile
 /// payload must not cost the archive the entry.
 #[cfg(feature = "thumbnails")]
-pub fn make(content: &[u8]) -> Thumbnail {
+pub(crate) fn make(content: &[u8]) -> Thumbnail {
     use image::ImageReader;
     use std::io::Cursor;
 
@@ -97,7 +97,7 @@ pub fn make(content: &[u8]) -> Thumbnail {
 /// Without the `thumbnails` feature the daemon never decodes an image, so it
 /// reports neither dimensions nor a thumbnail and the UI draws a kind icon.
 #[cfg(not(feature = "thumbnails"))]
-pub fn make(_content: &[u8]) -> Thumbnail {
+pub(crate) fn make(_content: &[u8]) -> Thumbnail {
     Thumbnail::default()
 }
 
@@ -110,7 +110,10 @@ pub fn make(_content: &[u8]) -> Thumbnail {
 /// this function's whole purpose. The same pixel cap as thumbnailing applies:
 /// a hostile or broken payload simply produces nothing.
 #[cfg(feature = "thumbnails")]
-pub fn write_bmp(content: &[u8], output: &mut (impl std::io::Write + std::io::Seek)) -> bool {
+pub(crate) fn write_bmp(
+    content: &[u8],
+    output: &mut (impl std::io::Write + std::io::Seek),
+) -> bool {
     transcode_bmp(content, output).is_some()
 }
 
@@ -145,7 +148,10 @@ fn transcode_bmp(content: &[u8], output: &mut (impl std::io::Write + std::io::Se
 
 /// Without `thumbnails` the daemon cannot decode, so it cannot re-encode.
 #[cfg(not(feature = "thumbnails"))]
-pub fn write_bmp(_content: &[u8], _output: &mut (impl std::io::Write + std::io::Seek)) -> bool {
+pub(crate) fn write_bmp(
+    _content: &[u8],
+    _output: &mut (impl std::io::Write + std::io::Seek),
+) -> bool {
     false
 }
 
@@ -156,15 +162,15 @@ fn to_bmp(content: &[u8]) -> Option<Vec<u8>> {
 }
 
 /// A thumbnail as the pixels a compositor can upload directly.
-pub struct Pixels {
-    pub rgba: Vec<u8>,
-    pub width: u32,
-    pub height: u32,
+pub(crate) struct Pixels {
+    pub(crate) rgba: Vec<u8>,
+    pub(crate) width: u32,
+    pub(crate) height: u32,
 }
 
 impl Pixels {
     /// Bytes per row. Always tight: the decoder produces no padding.
-    pub fn stride(&self) -> u32 {
+    pub(crate) fn stride(&self) -> u32 {
         self.width * 4
     }
 }
@@ -178,7 +184,7 @@ impl Pixels {
 /// same rule as everywhere else: a picker opening forty rows must not run
 /// forty decodes on the compositor's thread.
 #[cfg(feature = "thumbnails")]
-pub fn decode(png: &[u8]) -> Option<Pixels> {
+pub(crate) fn decode(png: &[u8]) -> Option<Pixels> {
     let mut reader = image::ImageReader::new(std::io::Cursor::new(png))
         .with_guessed_format()
         .ok()?;
@@ -198,7 +204,7 @@ pub fn decode(png: &[u8]) -> Option<Pixels> {
 }
 
 #[cfg(not(feature = "thumbnails"))]
-pub fn decode(_png: &[u8]) -> Option<Pixels> {
+pub(crate) fn decode(_png: &[u8]) -> Option<Pixels> {
     None
 }
 

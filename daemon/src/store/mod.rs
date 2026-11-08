@@ -7,9 +7,9 @@
 //! index lock, and that is a handful of small statements. One enormous paste
 //! therefore never stalls the picker's search.
 
-pub mod blobs;
-pub mod index;
-pub mod thumb;
+pub(crate) mod blobs;
+pub(crate) mod index;
+pub(crate) mod thumb;
 
 use crate::kind;
 use crate::proto::Summary;
@@ -30,7 +30,7 @@ const INDEXED_TEXT: u64 = 64 * 1024;
 /// Past this it records the entry and its dimensions but draws a kind icon.
 const THUMBNAILED_IMAGE: u64 = 64 * 1024 * 1024;
 
-pub struct Store {
+pub(crate) struct Store {
     blobs: Blobs,
     index: Mutex<Index>,
     budget: i64,
@@ -40,10 +40,10 @@ pub struct Store {
 }
 
 /// One representation a draft has accepted.
-pub struct Accepted {
-    pub mime: String,
-    pub digest: String,
-    pub bytes: u64,
+pub(crate) struct Accepted {
+    pub(crate) mime: String,
+    pub(crate) digest: String,
+    pub(crate) bytes: u64,
     _lease: blobs::Lease,
 }
 
@@ -53,18 +53,18 @@ struct Derived {
 }
 
 /// What a commit did.
-pub struct Committed {
-    pub entry: i64,
+pub(crate) struct Committed {
+    pub(crate) entry: i64,
     /// False when identical content was already in the archive and only its
     /// timestamp moved.
-    pub created: bool,
-    pub summary: Summary,
+    pub(crate) created: bool,
+    pub(crate) summary: Summary,
     /// Entries eviction removed to get back under budget.
-    pub evicted: Vec<i64>,
+    pub(crate) evicted: Vec<i64>,
 }
 
 #[derive(Debug)]
-pub enum StoreError {
+pub(crate) enum StoreError {
     Io(io::Error),
     Db(rusqlite::Error),
     TooLarge,
@@ -94,7 +94,7 @@ impl From<rusqlite::Error> for StoreError {
 
 impl StoreError {
     /// The protocol code a client should see for this failure.
-    pub fn code(&self) -> &'static str {
+    pub(crate) fn code(&self) -> &'static str {
         match self {
             StoreError::TooLarge => crate::proto::code::TOO_LARGE,
             _ => crate::proto::code::STORAGE,
@@ -106,11 +106,11 @@ type Result<T> = std::result::Result<T, StoreError>;
 
 impl Store {
     #[cfg(test)]
-    pub fn open(root: &Path, budget: i64) -> Result<Self> {
+    pub(crate) fn open(root: &Path, budget: i64) -> Result<Self> {
         Self::open_with_policy(root, budget, Some(604_800))
     }
 
-    pub fn open_with_policy(
+    pub(crate) fn open_with_policy(
         root: &Path,
         budget: i64,
         retention_seconds: Option<i64>,
@@ -142,11 +142,11 @@ impl Store {
         })
     }
 
-    pub fn budget(&self) -> i64 {
+    pub(crate) fn budget(&self) -> i64 {
         self.budget
     }
 
-    pub fn retention_days(&self) -> Option<u64> {
+    pub(crate) fn retention_days(&self) -> Option<u64> {
         self.retention_seconds
             .map(|seconds| (seconds / 86_400) as u64)
     }
@@ -155,7 +155,12 @@ impl Store {
     ///
     /// Deliberately takes no lock: this is the unbounded part of recording an
     /// entry, and a picker searching the archive must not wait behind it.
-    pub fn accept(&self, mime: &str, source: &mut impl Read, bytes: u64) -> Result<Accepted> {
+    pub(crate) fn accept(
+        &self,
+        mime: &str,
+        source: &mut impl Read,
+        bytes: u64,
+    ) -> Result<Accepted> {
         validate_mime(mime)?;
         // Compared in unsigned terms: a declared length above `i64::MAX`
         // would wrap to a negative number and slip past a signed check.
@@ -183,7 +188,7 @@ impl Store {
     /// The budget is checked as the pieces arrive rather than up front, which
     /// is the only thing that can be done when nobody has said how much is
     /// coming.
-    pub fn incoming(&self, mime: &str) -> Result<Incoming<'_>> {
+    pub(crate) fn incoming(&self, mime: &str) -> Result<Incoming<'_>> {
         validate_mime(mime)?;
         Ok(Incoming {
             writer: self.blobs.writer()?,
@@ -193,7 +198,7 @@ impl Store {
     }
 
     /// Publishes a draft's representations as one entry.
-    pub fn commit(
+    pub(crate) fn commit(
         &self,
         accepted: &[Accepted],
         source: Option<&str>,
@@ -348,7 +353,7 @@ impl Store {
         Ok(String::from_utf8_lossy(&raw).into_owned())
     }
 
-    pub fn list(
+    pub(crate) fn list(
         &self,
         limit: u32,
         before: Option<i64>,
@@ -360,14 +365,14 @@ impl Store {
         Ok(index.list(limit, before, query, only, pinned)?)
     }
 
-    pub fn summary(&self, entry: i64) -> Result<Option<Summary>> {
+    pub(crate) fn summary(&self, entry: i64) -> Result<Option<Summary>> {
         let index = self.index.lock().expect("index lock");
         Ok(index.summary(entry)?)
     }
 
     /// Opens one representation for serving back. The file handle is returned
     /// so the caller streams it to the socket without buffering it.
-    pub fn open_part(
+    pub(crate) fn open_part(
         &self,
         entry: i64,
         mime: Option<&str>,
@@ -398,7 +403,7 @@ impl Store {
     /// call — a fetch never writes back into the archive — and a build without
     /// `thumbnails` answers `None`, which the caller turns into the ordinary
     /// `no-such-mime`.
-    pub fn transcode(
+    pub(crate) fn transcode(
         &self,
         entry: i64,
         mime: &str,
@@ -438,7 +443,7 @@ impl Store {
     /// Stored as PNG and served as RGBA: a few kilobytes is the right thing to
     /// keep on disk, and pixels are the only thing the shell can draw without
     /// decoding something itself.
-    pub fn thumbnail(&self, entry: i64) -> Result<Option<thumb::Pixels>> {
+    pub(crate) fn thumbnail(&self, entry: i64) -> Result<Option<thumb::Pixels>> {
         let located = {
             let index = self.index.lock().expect("index lock");
             index
@@ -460,7 +465,7 @@ impl Store {
         Ok(thumb::decode(&png))
     }
 
-    pub fn set_pinned(&self, entry: i64, pinned: bool) -> Result<Option<Summary>> {
+    pub(crate) fn set_pinned(&self, entry: i64, pinned: bool) -> Result<Option<Summary>> {
         let index = self.index.lock().expect("index lock");
         if pinned {
             if index.summary(entry)?.is_none() {
@@ -478,7 +483,7 @@ impl Store {
         Ok(index.summary(entry)?)
     }
 
-    pub fn remove(&self, entry: i64) -> Result<bool> {
+    pub(crate) fn remove(&self, entry: i64) -> Result<bool> {
         let orphaned = {
             let mut index = self.index.lock().expect("index lock");
             if index.summary(entry)?.is_none() {
@@ -490,7 +495,7 @@ impl Store {
         Ok(true)
     }
 
-    pub fn clear(&self) -> Result<()> {
+    pub(crate) fn clear(&self) -> Result<()> {
         let orphaned = {
             let mut index = self.index.lock().expect("index lock");
             index.clear()?
@@ -501,7 +506,7 @@ impl Store {
 
     /// `(entries, pinned, bytes)` — what the archive holds and how much of it
     /// is marked favourite.
-    pub fn stats(&self) -> Result<(i64, i64, i64)> {
+    pub(crate) fn stats(&self) -> Result<(i64, i64, i64)> {
         let index = self.index.lock().expect("index lock");
         Ok((index.entries()?, index.pinned()?, index.bytes()?))
     }
@@ -529,7 +534,7 @@ impl Store {
         }
     }
 
-    pub fn discard(&self, parts: Vec<Accepted>) {
+    pub(crate) fn discard(&self, parts: Vec<Accepted>) {
         let digests = parts.iter().map(|part| part.digest.clone()).collect();
         drop(parts);
         self.sweep(digests);
@@ -537,7 +542,7 @@ impl Store {
 
     /// Automatic expiry deletes only unpinned rows older than the strict
     /// cutoff, in bounded batches using the existing recent-order index.
-    pub fn expire_before(&self, cutoff: i64) -> Result<Vec<i64>> {
+    pub(crate) fn expire_before(&self, cutoff: i64) -> Result<Vec<i64>> {
         let (orphaned, removed) = self
             .index
             .lock()
@@ -551,7 +556,7 @@ impl Store {
     ///
     /// Only a crash between a commit and its sweep can leave one, so this runs
     /// at startup and never again.
-    pub fn reconcile(&self, root: &Path) -> Result<u64> {
+    pub(crate) fn reconcile(&self, root: &Path) -> Result<u64> {
         let index = self.index.lock().expect("index lock");
         let known: std::collections::HashSet<String> = index.known_digests()?.into_iter().collect();
 
@@ -595,7 +600,7 @@ fn validate_mime(mime: &str) -> io::Result<()> {
 }
 
 /// A representation being streamed in without a declared length.
-pub struct Incoming<'a> {
+pub(crate) struct Incoming<'a> {
     writer: blobs::Writer<'a>,
     mime: String,
     budget: i64,
@@ -603,7 +608,7 @@ pub struct Incoming<'a> {
 
 impl Incoming<'_> {
     /// Takes one more piece of the representation.
-    pub fn absorb(&mut self, source: &mut impl Read, bytes: u64) -> Result<()> {
+    pub(crate) fn absorb(&mut self, source: &mut impl Read, bytes: u64) -> Result<()> {
         self.writer.absorb(source, bytes)?;
         if self.writer.written() > self.budget.max(0) as u64 {
             // Stop as soon as it is clear this cannot fit rather than after
@@ -613,7 +618,7 @@ impl Incoming<'_> {
         Ok(())
     }
 
-    pub fn finish(self) -> Result<Accepted> {
+    pub(crate) fn finish(self) -> Result<Accepted> {
         let Written {
             digest,
             bytes,
