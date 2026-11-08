@@ -5,6 +5,7 @@
 
 mod config;
 pub mod content;
+pub mod desktop;
 pub mod wire;
 
 pub use config::{

@@ -12,3 +12,8 @@ __pycache__/
 /target/
 /.tools/
 /.build/
+/ui/node_modules/
+/ui/dist/
+/ui/dist-preview/
+/ui/playwright-report/
+/ui/test-results/

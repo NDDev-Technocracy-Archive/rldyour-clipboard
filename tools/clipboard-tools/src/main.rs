@@ -1,10 +1,19 @@
-use nddev_clipboard_api::{content, wire};
+use nddev_clipboard_api::{content, desktop, wire};
 use serde_json::json;
 use std::path::Path;
 use utoipa::OpenApi;
 
 #[derive(OpenApi)]
-#[openapi(components(schemas(wire::Request, wire::Response, wire::Summary, wire::Role)))]
+#[openapi(components(schemas(
+    wire::Request,
+    wire::Response,
+    wire::Summary,
+    wire::Role,
+    desktop::View,
+    desktop::DesktopAction,
+    desktop::DesktopEntry,
+    desktop::DesktopResult
+)))]
 struct LocalContract;
 
 #[path = "../fingerprint.rs"]
@@ -122,6 +131,16 @@ fn generated(root: &Path, write: bool) -> Result<(), Box<dyn std::error::Error>>
         root,
         "extension/metadata.json",
         &(serde_json::to_string_pretty(&metadata)? + "\n"),
+        write,
+    )?;
+    let mut package: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(
+        root.join("ui/package.template.json"),
+    )?)?;
+    package["version"] = json!(version);
+    output(
+        root,
+        "ui/package.json",
+        &(serde_json::to_string_pretty(&package)? + "\n"),
         write,
     )?;
     println!("generated contracts are current ({version})");
