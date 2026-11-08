@@ -20,6 +20,18 @@ for (const language of ["ru", "en", "kk", "ar", "zh"] as const) {
       const errors: string[] = [];
       page.on("pageerror", (error) => errors.push(error.message));
       await page.goto(`${address}/?language=${language}&theme=${theme}`);
+      const fonts = await page.evaluate(async () => {
+        await document.fonts.ready;
+        const faces = Array.from(document.fonts);
+        return {
+          loaded: faces.filter((face) => face.status === "loaded").length,
+          failed: faces
+            .filter((face) => face.status === "error")
+            .map((face) => face.family),
+        };
+      });
+      expect(fonts.loaded).toBeGreaterThan(0);
+      expect(fonts.failed).toEqual([]);
       const labels = resources[language];
       await expect(page.getByRole("searchbox")).toBeVisible();
       await expect(page.locator(".entries-list > li")).toHaveCount(4);

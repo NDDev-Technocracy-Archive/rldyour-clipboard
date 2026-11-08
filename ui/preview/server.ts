@@ -38,7 +38,7 @@ export async function createPreviewServer() {
       response.setHeader("Cache-Control", "no-store");
       response.setHeader(
         "Content-Security-Policy",
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
       );
       response.end(request.method === "HEAD" ? undefined : bytes);
     } catch {
