@@ -4,11 +4,16 @@ NDDev Clipboard owns its capture backends, archive, retention, pinning and local
 It runs without an NDS account, replica or collector. The native clients and command-line
 client use the same archive interface.
 
-The Rust SDK consumes the contract types directly and streams representations through a
-caller-owned connection. It does not select a transport, start a service or provide cancellation
-for an arbitrary reader. Consumers apply their own whole-operation deadline at that connection
-boundary. Native clients resolve the selected profile through the product's Rust configuration
-reader; see [configuration](configuration.md).
+The Rust SDK consumes the contract types directly and streams representations. Its generic
+client accepts a caller-owned connection. `LocalOperation` also offers a pathname AF_UNIX
+connector with one caller-selected absolute deadline and a cancellation handle. The same deadline
+covers connect, negotiation and later requests; arriving bytes do not extend it. Native I/O waits
+use readiness notifications and explicit cancellation wakeups. External payload readers and
+destinations retain their own blocking policy. The SDK starts no service or collector. See its
+[runtime and ownership contract](../crates/sdk/README.md).
+
+Native clients resolve the selected profile through the product's Rust configuration reader;
+see [configuration](configuration.md).
 
 ## Local contract
 

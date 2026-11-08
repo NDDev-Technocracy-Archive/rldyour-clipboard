@@ -28,7 +28,7 @@ successive wakes. Cleanup removes metadata, search rows and unreferenced blobs.
 | Component | Responsibility |
 |---|---|
 | Rust `crates/api` | Configuration, v1 messages, content rules and generated schemas |
-| Rust `crates/sdk` | Streaming protocol client over a caller-owned connection |
+| Rust `crates/sdk` | Streaming client, with an owned-transport API and bounded native connector |
 | Rust `config` / `server` / `maintenance` | Policy, bounded connections, lifecycle and expiry |
 | Rust `store` | SQLite metadata/FTS, content-addressed blobs, leases, thumbnails |
 | Rust `storage_fs` | Private archive paths, platform file opens and pin synchronization |
@@ -158,9 +158,11 @@ Python/CLI uses standard Unix sockets on Linux/macOS (CPython does not expose
 AF_UNIX on Windows); Windows clients can use .NET Unix-domain sockets instead.
 
 The new [Rust SDK](crates/sdk) consumes the same Rust wire types as the daemon. It lists and pins
-entries, records streamed representations and fetches them into a writer. Its caller owns the
-connected transport, cancellation and whole-operation deadline. The SDK owns no archive or
-collector. [Integration](docs/integration.md) defines the external product boundary.
+entries, records streamed representations and fetches them into a writer. A caller can supply
+its own connected transport or use `LocalOperation` with an explicit pathname, absolute deadline
+and cancellation handle. Payload readers and destinations retain their own blocking policy.
+The SDK owns no archive or collector. [Integration](docs/integration.md) defines the external
+product boundary.
 
 ```sh
 uv tool install ./rldyour_clipboard-*.whl
