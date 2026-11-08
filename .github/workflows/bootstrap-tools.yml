@@ -59,3 +59,9 @@ jobs:
           cargo clippy --locked -p rldyour-clipboardd --all-targets --all-features -- -D warnings
           cargo test --locked -p rldyour-clipboardd --test profile_lifecycle --all-features
           cargo test --locked -p rldyour-clipboardd --all-features
+      - name: Measure safe native data reading
+        if: runner.os == 'macOS'
+        run: |
+          cargo build --locked --release -p rldyour-clipboardd --example macos-data-read --no-default-features
+          /usr/bin/time -l target/release/examples/macos-data-read stream 128
+          /usr/bin/time -l target/release/examples/macos-data-read copy 128

@@ -110,28 +110,41 @@ impl Recorder {
         );
     }
 
+    #[cfg(not(target_os = "macos"))]
     pub fn record_borrowed<'a>(
         &self,
         parts: impl IntoIterator<Item = (&'a str, &'a [u8])>,
         source: Option<&str>,
     ) {
+        self.record_readers(
+            parts
+                .into_iter()
+                .map(|(mime, bytes)| (mime, std::io::Cursor::new(bytes), bytes.len() as u64)),
+            source,
+        );
+    }
+
+    pub fn record_readers<'a, R: std::io::Read>(
+        &self,
+        parts: impl IntoIterator<Item = (&'a str, R, u64)>,
+        source: Option<&str>,
+    ) {
         let parts: Vec<_> = parts.into_iter().collect();
-        if parts.is_empty() || crate::kind::any_sensitive(parts.iter().map(|(mime, _)| *mime)) {
+        if parts.is_empty() || crate::kind::any_sensitive(parts.iter().map(|(mime, _, _)| *mime)) {
             return;
         }
 
         let mut accepted = Vec::with_capacity(parts.len());
-        for (mime, content) in parts {
-            match self.store.accept(
-                mime,
-                &mut std::io::Cursor::new(content),
-                content.len() as u64,
-            ) {
+        for (mime, mut content, bytes) in parts {
+            match self.store.accept(mime, &mut content, bytes) {
                 Ok(part) => accepted.push(part),
                 // One representation the archive will not take must not cost
                 // the entry its others.
                 Err(error) => {
-                    eprintln!("rldyour-clipboardd: skipping {mime}: {error}");
+                    eprintln!(
+                        "rldyour-clipboardd: representation skipped ({})",
+                        error.code()
+                    );
                 }
             }
         }
