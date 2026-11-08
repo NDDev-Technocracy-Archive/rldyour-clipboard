@@ -107,8 +107,8 @@ export class Client {
         const process = Gio.Subprocess.new(args,
             Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
         try {
-            const [, output] = await process.communicate_utf8_async(null, this._cancellable);
-            if (!process.get_successful() || output.length > 16 * 1024)
+            const [output] = await process.communicate_utf8_async(null, this._cancellable);
+            if (!process.get_successful() || typeof output !== 'string' || output.length > 16 * 1024)
                 throw new Error('Clipboard configuration is unavailable');
             const path = JSON.parse(output);
             if (typeof path !== 'string' || !GLib.path_is_absolute(path) || /[\x00-\x1f]/u.test(path))
