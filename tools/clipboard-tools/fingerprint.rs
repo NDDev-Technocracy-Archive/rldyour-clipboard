@@ -1,19 +1,24 @@
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
-pub(crate) fn fingerprint(root: &Path) -> std::io::Result<String> {
-    let mut files = vec![
-        PathBuf::from("Cargo.toml"),
-        PathBuf::from("Cargo.lock"),
-        PathBuf::from("rust-toolchain.toml"),
-    ];
-    for directory in ["crates/api", "tools/clipboard-tools"] {
-        collect(root, &PathBuf::from(directory), &mut files)?;
+pub(crate) fn fingerprint(root: &Path, directory: Option<&Path>) -> std::io::Result<String> {
+    let mut files = Vec::new();
+    if let Some(directory) = directory {
+        collect(root, directory, &mut files, true)?;
+    } else {
+        files.extend(["Cargo.toml", "Cargo.lock", "rust-toolchain.toml"].map(PathBuf::from));
+        for directory in ["crates/api", "tools/clipboard-tools"] {
+            collect(root, &PathBuf::from(directory), &mut files, false)?;
+        }
     }
     files.sort();
     let mut hash = Sha256::new();
     for path in files {
-        let content = std::fs::read(root.join(&path))?;
+        let file = root.join(&path);
+        if !std::fs::symlink_metadata(&file)?.is_file() {
+            return Err(std::io::Error::other("source input must be a regular file"));
+        }
+        let content = std::fs::read(file)?;
         let name = path
             .iter()
             .map(|part| part.to_string_lossy())
@@ -33,7 +38,12 @@ pub(crate) fn fingerprint(root: &Path) -> std::io::Result<String> {
     Ok(text)
 }
 
-fn collect(root: &Path, relative: &Path, files: &mut Vec<PathBuf>) -> std::io::Result<()> {
+fn collect(
+    root: &Path,
+    relative: &Path,
+    files: &mut Vec<PathBuf>,
+    all: bool,
+) -> std::io::Result<()> {
     for entry in std::fs::read_dir(root.join(relative))? {
         let entry = entry?;
         let kind = entry.file_type()?;
@@ -44,8 +54,9 @@ fn collect(root: &Path, relative: &Path, files: &mut Vec<PathBuf>) -> std::io::R
             ));
         }
         if kind.is_dir() {
-            collect(root, &path, files)?;
-        } else if path.extension().is_some_and(|value| value == "rs")
+            collect(root, &path, files, all)?;
+        } else if all
+            || path.extension().is_some_and(|value| value == "rs")
             || path.file_name().is_some_and(|value| value == "Cargo.toml")
         {
             files.push(path);

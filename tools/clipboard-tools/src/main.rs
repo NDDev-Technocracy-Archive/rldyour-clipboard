@@ -40,7 +40,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     if package["repository"].as_str() != Some(env!("CARGO_PKG_REPOSITORY")) {
         return Err("run the tool from the NDDev Clipboard source root".into());
     }
-    if fingerprint::fingerprint(&root)? != env!("CLIPBOARD_TOOLS_INPUTS") {
+    if fingerprint::fingerprint(&root, None)? != env!("CLIPBOARD_TOOLS_INPUTS") {
         return Err("tool inputs changed; prepare clipboard-tools from these sources".into());
     }
     match command.as_str() {
@@ -58,6 +58,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn generated(root: &Path, write: bool) -> Result<(), Box<dyn std::error::Error>> {
+    verify_ui_inputs(root)?;
     let schema = serde_json::to_string_pretty(&nddev_clipboard_api::config_schema())? + "\n";
     output(root, "contracts/config.schema.json", &schema, write)?;
     let mut api = serde_json::to_value(LocalContract::openapi())?;
@@ -173,6 +174,46 @@ fn output(
         std::fs::write(&path, text)?;
     } else if std::fs::read_to_string(&path)? != text {
         return Err(format!("{name} differs; run clipboard-tools generate").into());
+    }
+    Ok(())
+}
+
+fn verify_ui_inputs(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let manifest: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(root.join("ui/assets.lock.json"))?)?;
+    let path = manifest["design"]["path"]
+        .as_str()
+        .ok_or("design source path is missing")?;
+    if Path::new(path)
+        .components()
+        .any(|part| !matches!(part, std::path::Component::Normal(_)))
+    {
+        return Err("design source path must stay inside the UI source".into());
+    }
+    let source = root.join("ui").join(path);
+    let digest = fingerprint::fingerprint(&source, Some(Path::new("")))?;
+    if manifest["design"]["digest"].as_str() != Some(digest.as_str()) {
+        return Err("public design assets differ from the selected package digest".into());
+    }
+    let mut keys = None;
+    for entry in std::fs::read_dir(root.join("ui/locales"))? {
+        let path = entry?.path();
+        if path.extension().is_none_or(|extension| extension != "json") {
+            continue;
+        }
+        let strings: std::collections::BTreeMap<String, String> =
+            serde_json::from_str(&std::fs::read_to_string(&path)?)?;
+        if strings.is_empty() || strings.values().any(|value| value.trim().is_empty()) {
+            return Err("UI catalogues must contain nonempty translations".into());
+        }
+        let current: std::collections::BTreeSet<_> = strings.into_keys().collect();
+        if keys.as_ref().is_some_and(|expected| expected != &current) {
+            return Err("UI translation keysets differ".into());
+        }
+        keys = Some(current);
+    }
+    if keys.is_none() {
+        return Err("UI translation catalogues are missing".into());
     }
     Ok(())
 }

@@ -19,6 +19,12 @@ keyboard tabs, literal rendering of untrusted text, five languages and right-to-
 the product contract and preserve cancellation, deadlines, local ownership and clipboard format
 semantics before this replaces the existing desktop clients.
 
+The native TypeScript compiler checks the application. Hey API uses the qualified JavaScript
+compiler API line. The pinned ICU plugin imports i18next types without declaring that peer;
+`packageExtensions` supplies the missing graph edge for isolated installations. Its version
+still comes from the application's exact direct dependency. No declarations are skipped and
+no dependency files or shared package store are edited.
+
 Run source checks with `bun run check`. Build and run browser tests only on an execution host or
 runner: `bun run build:preview` and `bun run test`. Every test worker binds its temporary static
 server to an OS-assigned loopback port and closes it after the suite.

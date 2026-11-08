@@ -29,6 +29,7 @@ jobs:
         run: |
           cargo build --locked -p clipboard-tools
           target/debug/clipboard-tools generate
+          target/debug/clipboard-tools check
           cd ui
           bun install --frozen-lockfile --ignore-scripts
           bun run generate
