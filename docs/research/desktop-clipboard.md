@@ -66,9 +66,10 @@ and collecting its representations; independently reopening it per format can co
 copies. Inspection used commit `ed27008ae5d1f10cfbb266de039f0fb35fd05a56`, published crate 5.4.3,
 under BSL-1.0. The isolated console/Windows-subsystem probe now passes native
 notification, one locked multi-format read, Unicode file-list and shutdown cases;
-[ADR 0002](../decisions/0002-windows-clipboard-library.md) proposes its adoption
-and reviews all three resolved BSL-1.0 packages. The owner approved that exact
-library/license scope on 2026-11-08. The production adapter is now being qualified.
+[ADR 0002](../decisions/0002-windows-clipboard-library.md) accepts its adoption
+and reviews all three resolved BSL-1.0 packages. That exact library/license scope was
+approved on 2026-11-08. The production adapter passed the isolated native qualification,
+including debug and Windows-subsystem release first-copy capture.
 
 - [Monitor and shutdown](https://docs.rs/clipboard-win/latest/clipboard_win/monitor/struct.Monitor.html)
 - [Formats and file-list setters](https://github.com/DoumanAsh/clipboard-win/blob/ed27008ae5d1f10cfbb266de039f0fb35fd05a56/src/formats.rs)
@@ -111,7 +112,11 @@ applications rather than treating an X11-only or another compositor's test as GN
 The selected product behavior is durable file content, within the archive's configured budget.
 New copies should retain their bytes so restoration survives moving or deleting the originals.
 A copied photo file and image pixels still restore as their respective native representations.
-The storage encoding, migration and platform implementation are not yet qualified.
+[ADR 0003](../decisions/0003-durable-file-history.md) selects one streaming TAR per
+complete selection. The codec and SDK passed exact-byte preservation through the unchanged
+published baseline and restarted current daemon after synthetic originals were removed.
+Native source acquisition, private filesystem export and actual application paste remain
+unqualified; storage interoperability does not establish those surfaces.
 
 Publish a successful durable record only after all selected content is complete. Handle large
 files with bounded streaming, cancellation and a visible refusal when the budget cannot hold
@@ -122,6 +127,14 @@ Existing reference-only records have no saved file bytes. Do not claim that dele
 can be recovered, silently manufacture content or scan historical paths as an implicit backfill.
 Restoration exports must keep the immutable archive intact and retain their owned materialization
 until the native clipboard transfer finishes. No data migration or installed archive has changed.
+
+Windows documents stream-backed virtual file objects through OLE. AppKit documents file
+promises, whose compatibility with actual clipboard recipients still needs testing. Linux's
+FileTransfer portal offers descriptor export through a transfer key, but its transfer-close
+signal does not establish completion of every receiver's later read. Each platform therefore
+needs an explicit ownership boundary rather than cleanup triggered only by clipboard
+replacement. [Issue #16](https://github.com/NDDev-Technocracy-OpenNetwork/nddev-clipboard/issues/16)
+tracks qualification and any additional native proposal; it expands no accepted FFI scope.
 
 ## Product acceptance
 
