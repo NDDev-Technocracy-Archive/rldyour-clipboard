@@ -11,6 +11,8 @@ covers connect, negotiation and later requests; arriving bytes do not extend it.
 use readiness notifications and explicit cancellation wakeups. External payload readers and
 destinations retain their own blocking policy. The SDK starts no service or collector. See its
 [runtime and ownership contract](../crates/sdk/README.md).
+Streaming decoders can borrow one representation through `fetch_reader`; abandoning it makes
+that connection unusable, so a later request cannot mistake leftover payload for a control frame.
 
 Native clients resolve the selected profile through the product's Rust configuration reader;
 see [configuration](configuration.md).

@@ -417,6 +417,21 @@ fn the_rust_sdk_streams_real_multiformat_entries_and_recovers_from_a_refused_req
     assert_eq!(blob.mime, "application/octet-stream");
     assert_eq!(restored, payload);
     restored.clear();
+    let mut reader = client
+        .fetch_reader(entry, Some("application/octet-stream"), false)
+        .unwrap();
+    let mut offset = 0;
+    let mut chunk = [0; 8192];
+    loop {
+        let count = reader.read(&mut chunk).unwrap();
+        if count == 0 {
+            break;
+        }
+        assert_eq!(chunk[..count], payload[offset..offset + count]);
+        offset += count;
+    }
+    assert_eq!(offset, payload.len());
+    assert_eq!(reader.finish().unwrap().bytes, payload.len() as u64);
     client
         .fetch_to(entry, Some("text/html"), false, &mut restored)
         .unwrap();
@@ -452,6 +467,35 @@ fn the_rust_sdk_streams_real_multiformat_entries_and_recovers_from_a_refused_req
     assert_eq!(
         replacement.list(10, None, None, None).unwrap().items.len(),
         1
+    );
+    {
+        let mut reader = replacement
+            .fetch_reader(entry, Some("application/octet-stream"), false)
+            .unwrap();
+        reader.read_exact(&mut [0; 1]).unwrap();
+        // A decoder abandoning a representation must not expose its tail as JSON.
+    }
+    assert!(matches!(replacement.pin(entry, false), Err(Error::Closed)));
+    drop(replacement);
+
+    let mut incomplete = LocalOperation::new(Instant::now() + Duration::from_secs(5))
+        .connect(&endpoint, Role::Both)
+        .unwrap();
+    assert!(matches!(
+        incomplete
+            .fetch_reader(entry, Some("text/html"), false)
+            .unwrap()
+            .finish(),
+        Err(Error::TruncatedPayload)
+    ));
+    assert!(matches!(incomplete.pin(entry, false), Err(Error::Closed)));
+    drop(incomplete);
+    let mut reconnected = LocalOperation::new(Instant::now() + Duration::from_secs(5))
+        .connect(&endpoint, Role::Ui)
+        .unwrap();
+    assert_eq!(
+        reconnected.list(10, None, None, Some(true)).unwrap().items[0].id,
+        entry
     );
 }
 

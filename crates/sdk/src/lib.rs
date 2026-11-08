@@ -12,9 +12,11 @@ use std::sync::Arc;
 
 #[cfg(any(unix, windows))]
 mod local;
+mod payload;
 mod policy;
 #[cfg(any(unix, windows))]
 pub use local::{Cancellation, LocalOperation, LocalTransport};
+pub use payload::BlobReader;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -39,6 +41,7 @@ pub struct EntryPage {
     pub more: bool,
 }
 
+#[derive(Clone, Debug)]
 pub struct BlobInfo {
     pub mime: String,
     pub bytes: u64,
@@ -175,6 +178,26 @@ impl<T: Read + Write> Client<T> {
         transcode: bool,
         output: &mut impl Write,
     ) -> Result<BlobInfo, Error> {
+        let mut reader = self.fetch_reader(entry, mime, transcode)?;
+        let bytes = reader.info().bytes;
+        match policy::copy(&mut reader, output, bytes, None) {
+            Ok(count) if count == bytes => reader.finish(),
+            Ok(_) => reader.client.invalidate(Error::TruncatedPayload),
+            Err(error) if error.kind() == io::ErrorKind::UnexpectedEof => {
+                reader.client.invalidate(Error::TruncatedPayload)
+            }
+            Err(error) => reader.client.invalidate(Error::Transport(error.kind())),
+        }
+    }
+
+    /// Borrow the connection while a decoder consumes one representation.
+    /// Dropping an incomplete reader prevents reuse of the connection.
+    pub fn fetch_reader(
+        &mut self,
+        entry: i64,
+        mime: Option<&str>,
+        transcode: bool,
+    ) -> Result<BlobReader<'_, T>, Error> {
         control_text(mime)?;
         let req = self.request_id()?;
         self.send(&Request::Fetch {
@@ -189,13 +212,7 @@ impl<T: Read + Write> Client<T> {
         if bytes > i64::MAX as u64 {
             return self.invalidate(Error::InvalidFrame);
         }
-        // Read through the same buffer as the control frame: it can already
-        // contain the beginning of the representation or the next response.
-        match policy::copy(&mut self.stream, output, bytes, self.policy.as_deref()) {
-            Ok(count) if count == bytes => Ok(BlobInfo { mime, bytes }),
-            Ok(_) => self.invalidate(Error::TruncatedPayload),
-            Err(error) => self.invalidate(Error::Transport(error.kind())),
-        }
+        Ok(BlobReader::new(self, BlobInfo { mime, bytes }))
     }
 
     fn request_id(&mut self) -> Result<u64, Error> {
@@ -272,11 +289,15 @@ impl<T: Read + Write> Client<T> {
     }
 
     fn invalidate<R>(&mut self, error: Error) -> Result<R, Error> {
+        self.close();
+        Err(error)
+    }
+
+    fn close(&mut self) {
         self.usable = false;
         if let Some(policy) = &self.policy {
             policy.shutdown();
         }
-        Err(error)
     }
 
     fn check(&mut self) -> Result<(), Error> {

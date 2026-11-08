@@ -30,6 +30,12 @@ pins entries, records multiple streamed representations, aborts drafts and strea
 into a caller-owned writer. Control frames have a fixed bound; payloads do not pass through a
 complete in-memory SDK buffer. The SDK keeps exact 64-bit entry IDs in Rust.
 
+`fetch_reader` lends one representation directly to a streaming decoder. The mutable borrow
+keeps other requests off that connection, and the reader stops at the declared payload boundary
+even when later frames have already arrived. Fully reading it permits reuse; `finish` verifies
+completion and returns its metadata. Dropping an incomplete reader or finishing early closes the
+connection. Decoding does not require a second complete payload buffer or temporary archive.
+
 Truncated data, I/O failures and unexpected frames invalidate the connection. Drop that client
 so the daemon releases any draft. A matching remote request error preserves the connection.
 Protocol errors contain no copied content or remote diagnostic message.

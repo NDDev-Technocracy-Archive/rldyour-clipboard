@@ -44,14 +44,24 @@ fn prefetched_binary_and_the_next_control_frame_keep_their_boundaries() {
     responses.extend_from_slice(&[b'\n', 0xff, b'\n', 0, 3]);
     responses.extend_from_slice(b"{\"ev\":\"ok\",\"req\":2}\n");
     let mut client = client(&responses);
-    let mut payload = Vec::new();
-    let blob = client
-        .fetch_to(i64::MAX, None, false, &mut payload)
-        .unwrap();
+    let mut reader = client.fetch_reader(i64::MAX, None, false).unwrap();
+    let mut payload = [0; 4];
+    reader.read_exact(&mut payload).unwrap();
+    assert_eq!(reader.read(&mut [0; 1]).unwrap(), 0);
+    let blob = reader.finish().unwrap();
     assert_eq!(payload, [0xff, b'\n', 0, 3]);
     assert_eq!(blob.mime, "application/octet-stream");
     assert_eq!(blob.bytes, 4);
     client.pin(i64::MAX, true).unwrap();
+}
+
+#[test]
+fn an_empty_representation_does_not_consume_the_following_frame() {
+    let mut client = client(b"{\"ev\":\"blob\",\"req\":1,\"mime\":\"text/plain\",\"bytes\":0}\n{\"ev\":\"ok\",\"req\":2}\n");
+    let mut reader = client.fetch_reader(1, None, false).unwrap();
+    assert_eq!(reader.read(&mut [0; 1]).unwrap(), 0);
+    assert_eq!(reader.finish().unwrap().bytes, 0);
+    client.pin(1, true).unwrap();
 }
 
 #[test]
