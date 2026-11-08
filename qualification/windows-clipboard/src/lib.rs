@@ -98,7 +98,7 @@ fn qualify() -> Result<String, Box<dyn std::error::Error>> {
         raw::set_string_with(text, options::NoClear)?;
         formats::Html::new()
             .ok_or("could not register HTML")?
-            .write_clipboard(html)?;
+            .write_clipboard(&html)?;
         raw::set_without_clear(binary_format, &binary)?;
         raw::set_file_list(&files)?;
         drop(clipboard);
