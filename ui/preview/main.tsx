@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { I18nextProvider } from "react-i18next";
-import type { DesktopEntry } from "../generated/types.gen";
+import type { DesktopEntry } from "../generated/api/types.gen";
 import { ClipboardWindow, type HistorySource } from "../src/ClipboardWindow";
 import { type Language, localization, resources } from "../src/localization";
 

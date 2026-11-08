@@ -5,7 +5,7 @@ import type {
   DesktopEntry,
   DesktopResult,
   View,
-} from "../generated/types.gen";
+} from "../generated/api/types.gen";
 import { type Language, languageNames } from "./localization";
 import "./style.css";
 

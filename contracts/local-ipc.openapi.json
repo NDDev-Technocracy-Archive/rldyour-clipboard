@@ -1,6 +1,153 @@
 {
   "components": {
     "schemas": {
+      "DesktopAction": {
+        "oneOf": [
+          {
+            "properties": {
+              "action": {
+                "enum": [
+                  "browse"
+                ],
+                "type": "string"
+              },
+              "before": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "query": {
+                "type": "string"
+              },
+              "view": {
+                "$ref": "#/components/schemas/View"
+              }
+            },
+            "required": [
+              "view",
+              "query",
+              "action"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "action": {
+                "enum": [
+                  "favorite"
+                ],
+                "type": "string"
+              },
+              "key": {
+                "type": "string"
+              },
+              "pinned": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "key",
+              "pinned",
+              "action"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "action": {
+                "enum": [
+                  "restore"
+                ],
+                "type": "string"
+              },
+              "key": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "action"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "DesktopEntry": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Summary"
+          },
+          {
+            "properties": {
+              "key": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "DesktopResult": {
+        "oneOf": [
+          {
+            "properties": {
+              "items": {
+                "items": {
+                  "$ref": "#/components/schemas/DesktopEntry"
+                },
+                "type": "array"
+              },
+              "more": {
+                "type": "boolean"
+              },
+              "result": {
+                "enum": [
+                  "page"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "items",
+              "more",
+              "result"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "result": {
+                "enum": [
+                  "changed"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "result"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "result": {
+                "enum": [
+                  "restored"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "result"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "Request": {
         "oneOf": [
           {
@@ -831,6 +978,14 @@
           "at"
         ],
         "type": "object"
+      },
+      "View": {
+        "enum": [
+          "recent",
+          "history",
+          "favorites"
+        ],
+        "type": "string"
       }
     }
   },

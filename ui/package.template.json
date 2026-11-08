@@ -4,8 +4,8 @@
   "type": "module",
   "packageManager": "bun@1.4.4",
   "scripts": {
-    "generate": "openapi-ts",
-    "check": "biome check src preview tests locales *.json && oxlint --type-aware src preview && knip && bun node_modules/@typescript/native/bin/tsc --noEmit",
+    "generate": "openapi-ts --input ../contracts/local-ipc.openapi.json --output generated/api --plugins @hey-api/typescript",
+    "check": "biome check src preview tests locales *.json && oxlint --type-aware src preview && knip && bunx --no-install --package @typescript/native tsc --noEmit",
     "build:preview": "bun build ./preview/index.html --outdir ./dist-preview --target browser --minify",
     "test": "playwright test"
   },
@@ -26,6 +26,14 @@
     "oxlint": "1.91.0",
     "oxlint-tsgolint": "7.0.2005",
     "typescript": "6.0.3",
-    "@typescript/native": "npm:typescript@7.0.2"
+    "@typescript/native": "npm:typescript@7.0.2",
+    "@types/node": "24.19.2"
+  },
+  "packageExtensions": {
+    "i18next-icu": {
+      "peerDependencies": {
+        "i18next": "*"
+      }
+    }
   }
 }

@@ -4,6 +4,34 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+export type DesktopAction = {
+    action: 'browse';
+    before?: string | null;
+    query: string;
+    view: View;
+} | {
+    action: 'favorite';
+    key: string;
+    pinned: boolean;
+} | {
+    action: 'restore';
+    key: string;
+};
+
+export type DesktopEntry = Summary & {
+    key: string;
+};
+
+export type DesktopResult = {
+    items: Array<DesktopEntry>;
+    more: boolean;
+    result: 'page';
+} | {
+    result: 'changed';
+} | {
+    result: 'restored';
+};
+
 export type Request = {
     op: 'hello';
     role?: Role;
@@ -162,3 +190,5 @@ export type Summary = {
     thumb: boolean;
     width?: number | null;
 };
+
+export type View = 'recent' | 'history' | 'favorites';
