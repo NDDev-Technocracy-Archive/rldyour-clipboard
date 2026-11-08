@@ -40,7 +40,7 @@ jobs:
         working-directory: ui
         run: |
           bun run build:preview
-          bunx --no-install playwright install --with-deps chromium firefox webkit
+          bunx --bun --no-install playwright install --with-deps chromium firefox webkit
           bun run test
       - name: Preserve the generated candidate
         if: always()
@@ -51,8 +51,13 @@ jobs:
           cp contracts/local-ipc.openapi.json .build/frontend-candidate/
           cp target/debug/clipboard-tools .build/frontend-candidate/
           git rev-parse HEAD > .build/frontend-candidate/source-commit
-          cd .build/frontend-candidate
-          find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+          checksum_file="$(mktemp "$RUNNER_TEMP/clipboard-frontend-checksums.XXXXXX")"
+          trap 'rm -f -- "$checksum_file"' EXIT
+          (
+            cd .build/frontend-candidate
+            find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum
+          ) > "$checksum_file"
+          mv -- "$checksum_file" .build/frontend-candidate/SHA256SUMS
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:

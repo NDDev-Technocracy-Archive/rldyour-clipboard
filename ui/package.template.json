@@ -8,7 +8,7 @@
     "check": "biome check src preview tests locales *.json && oxlint --type-aware src preview && knip && bunx --no-install --package @typescript/native tsc --noEmit",
     "build:preview": "bun build ./preview/index.html --outdir ./dist-preview --target browser --minify",
     "preview": "bun ./preview/server.ts",
-    "test": "playwright test"
+    "test": "bunx --bun playwright test"
   },
   "dependencies": {
     "i18next": "26.7.1",
@@ -20,7 +20,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.6.4",
     "@hey-api/openapi-ts": "0.99.0",
-    "@playwright/test": "1.64.1",
+    "@playwright/test": "1.65.0",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "knip": "6.44.1",
