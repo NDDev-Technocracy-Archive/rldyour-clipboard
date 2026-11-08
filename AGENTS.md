@@ -1,8 +1,14 @@
-# rldyour-clipboard — working notes
+# NDDev Clipboard — working notes
 
-Current stable release: 0.2.1. Keep daemon, Python client, changelog and
-release metadata aligned; final machine qualification belongs in a metadata
-receipt outside this repository.
+The product version comes from daemon/Cargo.toml. Keep clients, changelog and
+release metadata aligned. Preserve original release identities and stored data.
+Final machine qualification belongs in a metadata receipt outside this repository.
+
+This is an independent public product. Keep NDS identity, replica stores, admission and
+telemetry composition in its adapter. Original code uses Apache-2.0; retain third-party
+notices. Keep private organization material and real clipboard content outside source,
+logs, screenshots and artifacts. Build and test on execution hosts or CI; source-only
+checks may run on the source host.
 
 Clipboard archive: a Rust daemon owns the store; thin platform clients capture
 and restore. Linux capture is split — the daemon watches X11 itself (XFIXES),

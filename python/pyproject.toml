@@ -4,11 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rldyour-clipboard"
-version = "0.2.1"
+version = "0.2.2"
 description = "Python client for the rldyour-clipboard archive daemon"
 readme = "README.md"
 requires-python = ">=3.9"
-license = "AGPL-3.0-or-later"
+license = "Apache-2.0"
 authors = [{ name = "NDDev OpenNetwork" }]
 classifiers = [
   "Programming Language :: Python :: 3",
@@ -18,9 +18,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/NDDev-OpenNetwork/rldyour-clipboard"
-Repository = "https://github.com/NDDev-OpenNetwork/rldyour-clipboard"
-Issues = "https://github.com/NDDev-OpenNetwork/rldyour-clipboard/issues"
+Homepage = "https://github.com/NDDev-Technocracy-OpenNetwork/nddev-clipboard"
+Repository = "https://github.com/NDDev-Technocracy-OpenNetwork/nddev-clipboard"
+Issues = "https://github.com/NDDev-Technocracy-OpenNetwork/nddev-clipboard/issues"
 
 [project.scripts]
 rldyour-clipboard = "rldyour_clipboard:main"

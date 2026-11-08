@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Static checks for the GNOME Shell extension.
-# SPDX-License-Identifier: AGPL-3.0-or-later
 #
 # The same script CI runs. Nothing here needs a running shell, which matters
 # because under Wayland there is no way to reload extension code without a new

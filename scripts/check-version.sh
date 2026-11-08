@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Checks that every place carrying a version agrees.
-# SPDX-License-Identifier: AGPL-3.0-or-later
 #
 # The daemon, the Python client and the changelog are released together, so a
 # mismatch is a release that ships two different answers to "which version is

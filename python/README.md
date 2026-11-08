@@ -1,6 +1,6 @@
 # rldyour-clipboard
 
-Python client for the [rldyour-clipboard](https://github.com/NDDev-OpenNetwork/rldyour-clipboard)
+Python client for [NDDev Clipboard](https://github.com/NDDev-Technocracy-OpenNetwork/nddev-clipboard)
 archive daemon: a clipboard history that keeps text, images and file
 references at any size, on Linux, macOS and Windows.
 
@@ -50,6 +50,6 @@ Payloads are streamed by the protocol and are never base64-encoded, so an
 entry is limited only by the archive's disk budget.
 
 The protocol is specified in
-[`docs/protocol.md`](https://github.com/NDDev-OpenNetwork/rldyour-clipboard/blob/main/docs/protocol.md).
+[`docs/protocol.md`](https://github.com/NDDev-Technocracy-OpenNetwork/nddev-clipboard/blob/main/docs/protocol.md).
 
-Licence: AGPL-3.0-or-later.
+Original client code: Apache-2.0. See the repository LICENSE and NOTICE.

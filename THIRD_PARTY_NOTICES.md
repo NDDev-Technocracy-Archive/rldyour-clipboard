@@ -17,6 +17,11 @@ The daemon links the following crates. Each is used under its own licence.
 
 The Python client depends on nothing outside the standard library.
 
+GNOME Shell, GJS, the operating-system frameworks and separately installed desktop
+tools are not bundled with the product. See [distribution licenses](docs/licenses.md)
+for the GNOME integration's compatibility boundary. Package archives must include
+this file, LICENSE, NOTICE and the applicable dependency license texts.
+
 ## Precedents
 
 The approach to clipboard capture under GNOME — `MetaSelection`'s

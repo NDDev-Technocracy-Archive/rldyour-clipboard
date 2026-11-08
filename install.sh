@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # rldyour-clipboard installer
-# SPDX-License-Identifier: AGPL-3.0-or-later
 #
 # Builds the daemon, installs it as a socket-activated user service, and puts
 # the extension where the shell looks for it. Everything lands under $HOME; no

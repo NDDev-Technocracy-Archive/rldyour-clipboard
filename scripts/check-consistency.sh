@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Checks the facts duplicated between the daemon and the extension.
-# SPDX-License-Identifier: AGPL-3.0-or-later
 #
 # Some tables genuinely have to exist twice: the extension decides what to
 # capture and the daemon decides what to serve back, and they are written in

@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # rldyour-clipboard uninstaller
-# SPDX-License-Identifier: AGPL-3.0-or-later
 #
 # Removes the program and leaves the archive alone: what the user copied is
 # their data, and deleting it is a separate, deliberate act.

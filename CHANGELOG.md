@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2 — unreleased
+
+- Publish NDDev Clipboard in OpenNetwork with the original repository and release history.
+- License original code under Apache-2.0 and retain third-party attribution.
+- Describe the standalone archive and NDS integration boundary.
+
 All notable changes to this project are documented here. The daemon, the
 Python client and this file are released together and carry the same version.
 

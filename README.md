@@ -1,10 +1,13 @@
-# rldyour-clipboard
+# NDDev Clipboard
 
 A local clipboard archive with a Rust daemon, a GNOME history picker and a
 native macOS menu. Text, rich text, images and file references retain their
 portable representations. Identical content is deduplicated on disk.
 
-Current stable release: **0.2.1**.
+The product runs independently of NDS. Its daemon owns the archive and capture lifecycle;
+clients use its local protocol. An NDS adapter can browse and fetch explicitly selected content
+through that same interface. See [integration](docs/integration.md) and the
+[release history](https://github.com/NDDev-Technocracy-OpenNetwork/nddev-clipboard/releases).
 
 **Unpinned entries expire seven days after their latest capture. Pinned entries
 stay until explicitly removed.** Re-copying recorded content refreshes its
@@ -140,7 +143,7 @@ Python/CLI uses standard Unix sockets on Linux/macOS (CPython does not expose
 AF_UNIX on Windows); Windows clients can use .NET Unix-domain sockets instead.
 
 ```sh
-uv tool install ./rldyour_clipboard-0.2.1-py3-none-any.whl
+uv tool install ./rldyour_clipboard-*.whl
 rldyour-clipboard list --favorites
 rldyour-clipboard pin 42
 rldyour-clipboard unpin 42
@@ -171,6 +174,12 @@ Never run fixtures against a user's archive or OS clipboard. CI checks Linux,
 macOS ARM/Intel, Windows, minimum Rust, GNOME transport and dependency advisories.
 See [quality notes](docs/quality.md) for limits and research sources.
 
-## Licence
+## License and attribution
 
-AGPL-3.0-or-later. Releases are distributed by this repository.
+Original code uses [Apache-2.0](LICENSE), with attribution in [NOTICE](NOTICE).
+Dependencies and the desktop platforms retain their own licenses; see
+[third-party notices](THIRD_PARTY_NOTICES.md). Previously issued releases retain their
+original license files and immutable artifacts.
+
+Created by Danil Silantyev, NDDev — <https://nddev.ai>.
+Please name NDDev and link this repository when crediting the product.

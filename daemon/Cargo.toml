@@ -1,11 +1,11 @@
 [package]
 name = "rldyour-clipboardd"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 rust-version = "1.95"
-license = "AGPL-3.0-or-later"
+license = "Apache-2.0"
 description = "Clipboard archive daemon with unbounded entry size for Linux, macOS, and Windows"
-repository = "https://github.com/NDDev-OpenNetwork/rldyour-clipboard"
+repository = "https://github.com/NDDev-Technocracy-OpenNetwork/nddev-clipboard"
 
 # Every dependency here is one the daemon cannot honestly do without.
 # `rusqlite` is bundled so the archive index needs nothing from the host;
