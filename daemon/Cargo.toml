@@ -52,6 +52,7 @@ thumbnails = ["dep:image"]
 [dev-dependencies]
 nddev-clipboard-sdk.workspace = true
 nddev-clipboard-files.workspace = true
+private-fs.workspace = true
 
 [lints]
 workspace = true

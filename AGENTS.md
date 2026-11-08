@@ -39,6 +39,10 @@ Windows native capture acceptance requires an explicitly isolated CI desktop and
 `just test-platform-client` builds this source and exercises the retained GJS or Swift socket
 client on Linux/macOS. It uses a private complete profile with native capture disabled; it does
 not select an installed daemon. This qualifies client RPC, not a live GNOME Shell or native menu.
+The retained-release file fixture restores through `private-fs` capabilities and reopens the
+private destination before reading its bytes. That test-only dependency qualifies destination
+creation on each native target; it does not migrate archive permissions or select native file
+transfer ownership. Existing archives are never implicitly hardened.
 Keep the Windows occupied-path preservation regression enabled; its failure blocks release.
 The temporary branch workflows do not qualify installation or replace the final delivery gates.
 

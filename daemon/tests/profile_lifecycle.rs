@@ -398,11 +398,14 @@ fn restore_synthetic_files(
         wire::Role,
     };
     use nddev_clipboard_sdk::LocalOperation;
+    use private_fs::PrivateDir;
     use sha2::{Digest, Sha256};
 
     assert!(!root.join("original-files").exists());
     let destination = root.join(directory);
-    std::fs::create_dir(&destination).unwrap();
+    // Qualify a private destination independently of archive migration and
+    // native clipboard transfer ownership. Never hard-link writable exports.
+    let private = PrivateDir::ensure(&destination).unwrap();
     let mut client = LocalOperation::new(Instant::now() + Duration::from_secs(15))
         .connect(endpoint, Role::Ui)
         .unwrap();
@@ -414,28 +417,33 @@ fn restore_synthetic_files(
         let path = node
             .path
             .iter()
-            .fold(destination.clone(), |path, name| path.join(name));
+            .fold(PathBuf::new(), |path, name| path.join(name));
         match node.content {
-            FileContent::Directory => std::fs::create_dir(path),
-            FileContent::File { .. } => {
-                let mut file = std::fs::File::options()
-                    .write(true)
-                    .create_new(true)
-                    .open(path)?;
-                std::io::copy(input, &mut file).map(|_| ())
+            FileContent::Directory => private
+                .create_dir(path)
+                .map(|_| ())
+                .map_err(std::io::Error::other),
+            FileContent::File { bytes } => {
+                let mut file = private.create(path).map_err(std::io::Error::other)?;
+                if std::io::copy(input, &mut file)? != bytes {
+                    return Err(std::io::Error::other("incomplete private export"));
+                }
+                file.sync_all().map_err(std::io::Error::other)
             }
         }
     })
     .unwrap();
     assert!(manifest == expected.manifest);
     reader.finish().unwrap();
+    drop(private);
+    let restored = PrivateDir::open(&destination).unwrap();
     let page = client.list(10, None, None, Some(true)).unwrap();
     assert!(
         page.items
             .iter()
             .any(|summary| summary.id == expected.entry)
     );
-    let mut large = std::fs::File::open(destination.join("files/Құжат.bin")).unwrap();
+    let mut large = restored.open_file("files/Құжат.bin").unwrap();
     let mut buffer = [0; 8192];
     let mut hash = Sha256::new();
     loop {
@@ -446,10 +454,13 @@ fn restore_synthetic_files(
         hash.update(&buffer[..count]);
     }
     assert_eq!(hash.finalize().to_vec(), expected.large_digest);
-    assert_eq!(
-        std::fs::read(destination.join("files/Фото.png")).unwrap(),
-        PNG
-    );
+    let mut photo = Vec::new();
+    restored
+        .open_file("files/Фото.png")
+        .unwrap()
+        .read_to_end(&mut photo)
+        .unwrap();
+    assert_eq!(photo, PNG);
 }
 
 #[test]
