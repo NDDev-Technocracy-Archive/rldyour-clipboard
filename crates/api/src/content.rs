@@ -190,10 +190,12 @@ pub fn is_image(mime: &str) -> bool {
 }
 
 pub fn is_files(mime: &str) -> bool {
-    matches!(
-        lower(mime).as_str(),
-        "x-special/gnome-copied-files" | "x-special/nautilus-clipboard" | "text/uri-list"
-    )
+    let lowered = lower(mime);
+    lowered == crate::files::MIME
+        || matches!(
+            lowered.as_str(),
+            "x-special/gnome-copied-files" | "x-special/nautilus-clipboard" | "text/uri-list"
+        )
 }
 
 /// Derives the kind from what an entry holds.

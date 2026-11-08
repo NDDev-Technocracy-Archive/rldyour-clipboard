@@ -660,6 +660,7 @@ dependencies = [
  "image",
  "libc",
  "nddev-clipboard-api",
+ "nddev-clipboard-files",
  "nddev-clipboard-platform",
  "nddev-clipboard-sdk",
  "objc2",

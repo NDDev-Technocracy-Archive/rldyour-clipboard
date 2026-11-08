@@ -36,6 +36,12 @@ even when later frames have already arrived. Fully reading it permits reuse; `fi
 completion and returns its metadata. Dropping an incomplete reader or finishing early closes the
 connection. Decoding does not require a second complete payload buffer or temporary archive.
 
+`part_writer` lends the sending side to an encoder with an exact declared length. It never
+writes beyond that boundary. `finish` is mandatory: it flushes the body and consumes the part's
+matching acknowledgement. Dropping the writer without it closes the connection even after all
+body bytes were written. A matching remote refusal consumes its reply and permits reuse.
+File-selection encoding can therefore stream straight to the daemon without an intermediate TAR.
+
 Truncated data, I/O failures and unexpected frames invalidate the connection. Drop that client
 so the daemon releases any draft. A matching remote request error preserves the connection.
 Protocol errors contain no copied content or remote diagnostic message.

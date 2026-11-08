@@ -35,6 +35,7 @@ clipboard-win = { version = "=5.4.3", features = ["std", "monitor"] }
 nddev-clipboard-api = { path = "crates/api", version = "=0.2.2" }
 nddev-clipboard-sdk = { path = "crates/sdk", version = "=0.2.2" }
 nddev-clipboard-platform = { path = "crates/platform", version = "=0.2.2" }
+nddev-clipboard-files = { path = "crates/files", version = "=0.2.2" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

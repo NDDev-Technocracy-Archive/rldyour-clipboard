@@ -16,7 +16,7 @@ mod payload;
 mod policy;
 #[cfg(any(unix, windows))]
 pub use local::{Cancellation, LocalOperation, LocalTransport};
-pub use payload::BlobReader;
+pub use payload::{BlobReader, PartWriter};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -136,6 +136,23 @@ impl<T: Read + Write> Client<T> {
         bytes: u64,
         input: &mut impl Read,
     ) -> Result<(), Error> {
+        let policy = self.policy.clone();
+        let mut writer = self.part_writer(draft, mime, bytes)?;
+        match policy::copy(input, &mut writer, bytes, policy.as_deref()) {
+            Ok(count) if count == bytes => writer.finish(),
+            Ok(_) => writer.client.invalidate(Error::TruncatedPayload),
+            Err(error) => writer.client.invalidate(Error::Transport(error.kind())),
+        }
+    }
+
+    /// Borrow the connection while an encoder writes one declared representation.
+    /// `finish` is required to consume the acknowledgement before another request.
+    pub fn part_writer(
+        &mut self,
+        draft: u64,
+        mime: &str,
+        bytes: u64,
+    ) -> Result<PartWriter<'_, T>, Error> {
         control_text(Some(mime))?;
         if bytes > i64::MAX as u64 {
             return Err(Error::InvalidFrame);
@@ -147,13 +164,7 @@ impl<T: Read + Write> Client<T> {
             mime: mime.to_owned(),
             bytes: Some(bytes),
         })?;
-        let result = policy::copy(input, self.stream.get_mut(), bytes, self.policy.as_deref())
-            .and_then(|count| self.stream.get_mut().flush().map(|()| count));
-        match result {
-            Ok(count) if count == bytes => self.expect_ok(req),
-            Ok(_) => self.invalidate(Error::TruncatedPayload),
-            Err(error) => self.invalidate(Error::Transport(error.kind())),
-        }
+        Ok(PartWriter::new(self, req, bytes))
     }
 
     pub fn commit(&mut self, draft: u64) -> Result<i64, Error> {
@@ -178,9 +189,10 @@ impl<T: Read + Write> Client<T> {
         transcode: bool,
         output: &mut impl Write,
     ) -> Result<BlobInfo, Error> {
+        let policy = self.policy.clone();
         let mut reader = self.fetch_reader(entry, mime, transcode)?;
         let bytes = reader.info().bytes;
-        match policy::copy(&mut reader, output, bytes, None) {
+        match policy::copy(&mut reader, output, bytes, policy.as_deref()) {
             Ok(count) if count == bytes => reader.finish(),
             Ok(_) => reader.client.invalidate(Error::TruncatedPayload),
             Err(error) if error.kind() == io::ErrorKind::UnexpectedEof => {
@@ -310,6 +322,13 @@ impl<T: Read + Write> Client<T> {
             return self.invalidate(Error::Transport(error.kind()));
         }
         Ok(())
+    }
+
+    fn io_check(&mut self) -> io::Result<()> {
+        self.check().map_err(|error| match error {
+            Error::Transport(kind) => kind.into(),
+            _ => io::ErrorKind::NotConnected.into(),
+        })
     }
 }
 

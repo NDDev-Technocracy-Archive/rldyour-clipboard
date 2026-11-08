@@ -65,6 +65,49 @@ fn an_empty_representation_does_not_consume_the_following_frame() {
 }
 
 #[test]
+fn an_upload_consumes_its_acknowledgement_even_without_payload_bytes() {
+    let mut client = client(b"{\"ev\":\"ok\",\"req\":1}\n{\"ev\":\"ok\",\"req\":2}\n");
+    client
+        .part_writer(1, "application/octet-stream", 0)
+        .unwrap()
+        .finish()
+        .unwrap();
+    client.pin(1, true).unwrap();
+}
+
+#[test]
+fn an_unacknowledged_or_overlong_upload_prevents_later_requests() {
+    for excess in [false, true] {
+        let mut client = client(b"{\"ev\":\"ok\",\"req\":1}\n{\"ev\":\"ok\",\"req\":2}\n");
+        {
+            let mut writer = client
+                .part_writer(1, "application/octet-stream", 4)
+                .unwrap();
+            writer.write_all(b"part").unwrap();
+            if excess {
+                assert_eq!(
+                    writer.write(b"extra").unwrap_err().kind(),
+                    io::ErrorKind::WriteZero
+                );
+            }
+            // Finishing the byte count alone does not consume the part reply.
+        }
+        assert!(matches!(client.pin(1, true), Err(Error::Closed)));
+    }
+}
+
+#[test]
+fn a_matching_upload_refusal_preserves_the_connection() {
+    let mut client = client(b"{\"ev\":\"error\",\"req\":1,\"code\":\"budget\",\"message\":\"unused\"}\n{\"ev\":\"ok\",\"req\":2}\n");
+    let mut writer = client
+        .part_writer(1, "application/octet-stream", 4)
+        .unwrap();
+    writer.write_all(b"part").unwrap();
+    assert!(matches!(writer.finish(), Err(Error::Remote { code }) if code == "budget"));
+    client.pin(1, true).unwrap();
+}
+
+#[test]
 fn an_oversized_or_unterminated_frame_invalidates_the_connection() {
     for response in [
         vec![b' '; MAX_FRAME + 1],

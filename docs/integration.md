@@ -13,6 +13,8 @@ destinations retain their own blocking policy. The SDK starts no service or coll
 [runtime and ownership contract](../crates/sdk/README.md).
 Streaming decoders can borrow one representation through `fetch_reader`; abandoning it makes
 that connection unusable, so a later request cannot mistake leftover payload for a control frame.
+Encoders use `part_writer` with an exact declared length and consume its acknowledgement through
+`finish`. An incomplete or unacknowledged upload cannot lend its response to another request.
 
 Native clients resolve the selected profile through the product's Rust configuration reader;
 see [configuration](configuration.md).

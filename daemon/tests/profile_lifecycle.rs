@@ -7,6 +7,9 @@ use std::process::{Child, Command, Output, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
+#[path = "support/image.rs"]
+mod fixture_image;
+
 #[cfg(unix)]
 use std::os::unix::net::UnixStream as Stream;
 #[cfg(windows)]
@@ -248,12 +251,13 @@ fn published_archive_survives_upgrade_and_return_to_the_unmodified_baseline_rele
     let added = format!("New version: {}", "x".repeat(3 * 1024 * 1024));
     let second = peer.record(added.as_bytes());
     peer.request(json!({"op":"pin", "req":6, "entry":second, "pinned":true}));
+    let files = record_synthetic_files(&fixture.0, &endpoint);
     drop(peer);
     drop(new);
 
-    let (_old_again, mut peer) = Daemon::start_command(old_command(), &endpoint);
+    let (old_again, mut peer) = Daemon::start_command(old_command(), &endpoint);
     let page = peer.request(json!({"op":"list", "req":7, "pinned":true}));
-    assert_eq!(page["items"].as_array().unwrap().len(), 2);
+    assert_eq!(page["items"].as_array().unwrap().len(), 3);
     for (entry, expected) in [(first, original), (second, added.as_bytes())] {
         let blob = peer.request(json!({"op":"fetch", "req":8, "entry":entry}));
         assert_eq!(blob["bytes"].as_u64().unwrap(), expected.len() as u64);
@@ -261,6 +265,186 @@ fn published_archive_survives_upgrade_and_return_to_the_unmodified_baseline_rele
         peer.0.read_exact(&mut actual).unwrap();
         assert_eq!(actual, expected);
     }
+    restore_synthetic_files(&fixture.0, &endpoint, &files, "baseline-export");
+    drop(peer);
+    drop(old_again);
+    let (_new_again, _peer) = Daemon::start(&profile, &endpoint);
+    restore_synthetic_files(&fixture.0, &endpoint, &files, "current-export");
+}
+
+struct SyntheticFiles {
+    entry: i64,
+    bytes: u64,
+    manifest: nddev_clipboard_api::files::FileManifest,
+    large_digest: Vec<u8>,
+}
+
+fn record_synthetic_files(root: &Path, endpoint: &Path) -> SyntheticFiles {
+    use nddev_clipboard_api::{
+        files::{FileContent, FileManifest, FileNode, MIME},
+        wire::Role,
+    };
+    use nddev_clipboard_files::PreparedSelection;
+    use nddev_clipboard_sdk::{Error, LocalOperation};
+    use sha2::{Digest, Sha256};
+
+    let originals = root.join("original-files");
+    std::fs::create_dir(&originals).unwrap();
+    let large = originals.join("large.bin");
+    let photo = originals.join("photo.png");
+    std::fs::write(&photo, fixture_image::PNG).unwrap();
+    let mut output = std::fs::File::create(&large).unwrap();
+    let buffer = [0x4b; 64 * 1024];
+    let length = 3 * 1024 * 1024 + 17;
+    let mut left = length;
+    let mut hash = Sha256::new();
+    while left > 0 {
+        let count = left.min(buffer.len() as u64) as usize;
+        output.write_all(&buffer[..count]).unwrap();
+        hash.update(&buffer[..count]);
+        left -= count as u64;
+    }
+    drop(output);
+    let mut nodes = vec![
+        FileNode {
+            path: vec!["files".into()],
+            content: FileContent::Directory,
+        },
+        FileNode {
+            path: vec!["files".into(), "Құжат.bin".into()],
+            content: FileContent::File { bytes: length },
+        },
+        FileNode {
+            path: vec!["files".into(), "Фото.png".into()],
+            content: FileContent::File {
+                bytes: fixture_image::PNG.len() as u64,
+            },
+        },
+    ];
+    nodes.sort_by(|left, right| left.path.cmp(&right.path));
+    let manifest = FileManifest::new(nodes).unwrap();
+    let selection = PreparedSelection::new(manifest.clone()).unwrap();
+    let mut client = LocalOperation::new(Instant::now() + Duration::from_secs(15))
+        .connect(endpoint, Role::Both)
+        .unwrap();
+    let before = client.list(10, None, None, None).unwrap().items.len();
+    let mut entry = None;
+    for _ in 0..2 {
+        let draft = client.begin(Some("synthetic durable files")).unwrap();
+        let mut writer = client.part_writer(draft, MIME, selection.bytes()).unwrap();
+        selection
+            .write_to(&mut writer, |index| {
+                let name = selection.manifest().nodes[index].path.last().unwrap();
+                std::fs::File::open(match name.as_str() {
+                    "Құжат.bin" => &large,
+                    "Фото.png" => &photo,
+                    _ => panic!("only declared files are opened"),
+                })
+            })
+            .unwrap();
+        writer.finish().unwrap();
+        let recorded = client.commit(draft).unwrap();
+        if let Some(previous) = entry {
+            assert_eq!(recorded, previous);
+        }
+        entry = Some(recorded);
+    }
+    let entry = entry.unwrap();
+    client.pin(entry, true).unwrap();
+    let discarded = client.begin(None).unwrap();
+    {
+        let mut writer = client
+            .part_writer(discarded, MIME, selection.bytes())
+            .unwrap();
+        writer.write_all(b"incomplete container").unwrap();
+    }
+    assert!(matches!(client.commit(discarded), Err(Error::Closed)));
+    drop(client);
+    let mut client = LocalOperation::new(Instant::now() + Duration::from_secs(5))
+        .connect(endpoint, Role::Ui)
+        .unwrap();
+    let page = client.list(10, None, None, None).unwrap();
+    assert_eq!(page.items.len(), before + 1);
+    let summary = page
+        .items
+        .iter()
+        .find(|summary| summary.id == entry)
+        .unwrap();
+    assert_eq!(summary.kind, "files");
+    assert!(summary.pinned);
+    assert_eq!(summary.bytes as u64, selection.bytes());
+    std::fs::remove_dir_all(originals).unwrap();
+    SyntheticFiles {
+        entry,
+        bytes: selection.bytes(),
+        manifest,
+        large_digest: hash.finalize().to_vec(),
+    }
+}
+
+fn restore_synthetic_files(
+    root: &Path,
+    endpoint: &Path,
+    expected: &SyntheticFiles,
+    directory: &str,
+) {
+    use nddev_clipboard_api::{
+        files::{FileContent, MIME},
+        wire::Role,
+    };
+    use nddev_clipboard_sdk::LocalOperation;
+    use sha2::{Digest, Sha256};
+
+    assert!(!root.join("original-files").exists());
+    let destination = root.join(directory);
+    std::fs::create_dir(&destination).unwrap();
+    let mut client = LocalOperation::new(Instant::now() + Duration::from_secs(15))
+        .connect(endpoint, Role::Ui)
+        .unwrap();
+    let mut reader = client
+        .fetch_reader(expected.entry, Some(MIME), false)
+        .unwrap();
+    assert_eq!(reader.info().bytes, expected.bytes);
+    let manifest = nddev_clipboard_files::decode(&mut reader, |node, input| {
+        let path = node
+            .path
+            .iter()
+            .fold(destination.clone(), |path, name| path.join(name));
+        match node.content {
+            FileContent::Directory => std::fs::create_dir(path),
+            FileContent::File { .. } => {
+                let mut file = std::fs::File::options()
+                    .write(true)
+                    .create_new(true)
+                    .open(path)?;
+                std::io::copy(input, &mut file).map(|_| ())
+            }
+        }
+    })
+    .unwrap();
+    assert!(manifest == expected.manifest);
+    reader.finish().unwrap();
+    let page = client.list(10, None, None, Some(true)).unwrap();
+    assert!(
+        page.items
+            .iter()
+            .any(|summary| summary.id == expected.entry)
+    );
+    let mut large = std::fs::File::open(destination.join("files/Құжат.bin")).unwrap();
+    let mut buffer = [0; 8192];
+    let mut hash = Sha256::new();
+    loop {
+        let count = large.read(&mut buffer).unwrap();
+        if count == 0 {
+            break;
+        }
+        hash.update(&buffer[..count]);
+    }
+    assert_eq!(hash.finalize().to_vec(), expected.large_digest);
+    assert_eq!(
+        std::fs::read(destination.join("files/Фото.png")).unwrap(),
+        fixture_image::PNG
+    );
 }
 
 #[test]
