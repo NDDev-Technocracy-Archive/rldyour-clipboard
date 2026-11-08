@@ -149,7 +149,6 @@ pub fn decode<R: Read>(
     if expected.sha256 != actual.sha256 {
         return Err(Error::Integrity);
     }
-    drop(entries);
     let mut input = archive.into_inner();
     let bytes = container_bytes(&manifest, manifest_bytes, digest_bytes)?;
     let remaining = bytes.checked_sub(input.count).ok_or(Error::Container)?;
