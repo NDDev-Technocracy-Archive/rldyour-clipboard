@@ -1,6 +1,8 @@
 # Native platform boundary
 
-Status: proposed; approval is required before promotion.
+Status: under discussion. The initial proposal is not approved. Complete the
+[desktop investigation](../research/desktop-clipboard.md) and discuss transport, native API reuse
+and the remaining exception scope before implementation or promotion.
 
 Clipboard needs native clipboard notifications, platform-managed socket activation and private
 filesystem operations. These are existing product capabilities. The standalone configuration
@@ -14,8 +16,8 @@ database, service composition or NDS. It may depend on the public product contra
 
 The permitted native surface is limited to:
 
-- Existing POSIX private file opens, directory synchronization, archive locks and inherited
-  systemd/launchd AF_UNIX listeners. Validate inherited listener type and configured local path;
+- Inherited systemd/launchd AF_UNIX listeners. Private file opens, directory synchronization and
+  archive locks already use safe Rust APIs and do not need an exception. Validate inherited listener type and configured local path;
   set close-on-exec and preserve ownership on every failure.
 - Existing AppKit pasteboard reads, with autorelease-scoped borrowed bytes passed synchronously
   to a safe recorder interface.
