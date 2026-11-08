@@ -53,7 +53,9 @@ real cancellation/deadline and abrupt-restart qualification; no performance adva
 - [Synchronous timeout limitation](https://github.com/kotauskas/interprocess/blob/885d96bd89a94fa03e7f813c3e3017ebdd8f9a38/src/os/windows/named_pipe/local_socket/stream.rs)
 - [Tokio pipe options](https://docs.rs/tokio/latest/tokio/net/windows/named_pipe/struct.ServerOptions.html)
 
-Both choices use local IPC and require no TCP port. No new transport has been selected.
+Both choices use local IPC and require no TCP port. ADR 0001 retains the existing
+AF_UNIX/v1 transport. The systemd/launchd activation and Windows occupied-path
+boundary passed native qualification on Linux, Windows and both macOS architectures.
 
 ## Capture and restoration
 
@@ -62,7 +64,10 @@ and file-list reading/writing. Its owned monitor can replace application-owned c
 machinery. Qualified use must hold one clipboard transaction while checking privacy markers
 and collecting its representations; independently reopening it per format can combine different
 copies. Inspection used commit `ed27008ae5d1f10cfbb266de039f0fb35fd05a56`, published crate 5.4.3,
-under BSL-1.0. Adoption is not yet approved or qualified.
+under BSL-1.0. The isolated console/Windows-subsystem probe now passes native
+notification, one locked multi-format read, Unicode file-list and shutdown cases;
+[ADR 0002](../decisions/0002-windows-clipboard-library.md) proposes its adoption
+and reviews all three resolved BSL-1.0 packages. Product adoption remains pending.
 
 - [Monitor and shutdown](https://docs.rs/clipboard-win/latest/clipboard_win/monitor/struct.Monitor.html)
 - [Formats and file-list setters](https://github.com/DoumanAsh/clipboard-win/blob/ed27008ae5d1f10cfbb266de039f0fb35fd05a56/src/formats.rs)
@@ -76,10 +81,12 @@ requirements. Inspection used commit `7b598dfaf7f2e1f9d9d0a441e114dc91e4663b31`;
 - [Apple change count](https://developer.apple.com/documentation/appkit/nspasteboard/changecount)
 - [Apple pasteboard access behavior](https://developer.apple.com/documentation/AppKit/NSPasteboard?changes=_5)
 
-The current macOS path avoids another full-size payload allocation by borrowing NSData only
-inside its owning autorelease scope. The existing Foundation crate also supplies safe
-`NSData::to_vec`, which copies its bytes. Compare actual native memory and latency before
-choosing a replacement; do not label moving an unchecked borrow behind another package a fix.
+The previous macOS path borrowed NSData through an unchecked application call.
+The candidate replaces it with an immutable Foundation snapshot and safe bounded
+range copies into the archive writer. `NSData::to_vec` on the entire object would
+allocate a full Rust payload; `NSData::iter` also makes that copy internally.
+Native byte-accuracy and one-shot 128 MiB resource evidence qualify the safe range
+reader. Resource results are still pending; no efficiency improvement is assumed.
 
 GNOME selection access remains a compositor integration. Mutter exposes selection source MIME
 lists and asynchronous reads. Qualify against the supported shell versions and native clipboard
