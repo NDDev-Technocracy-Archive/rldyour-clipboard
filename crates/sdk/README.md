@@ -9,8 +9,15 @@ The generic `Client::new` leaves transport policy with its caller.
 requests and streamed socket I/O without renewing the budget when bytes arrive. Its cancellation
 handle shuts down only that operation's connected socket; cancellation during connect is checked
 before and after the deadline-bounded connect. The handle holds a weak socket reference, so keeping
-it does not retain a dropped connection or affect a replacement. No worker, retry loop, collector,
-listener, global runtime or environment-dependent endpoint is created.
+it does not retain a dropped connection or affect a replacement. No collector, listener or
+environment-dependent endpoint is created.
+
+Connected I/O uses the safe `async-io` readiness adapter, its absolute timer and an explicit
+cancellation waker. The current calling thread processes events through `block_on`; the library
+also owns a shared fallback I/O thread. There is no thread per connection or NDS runtime. On
+Windows, shutting down a socket alone did not interrupt a pending blocking receive in native
+qualification; readiness waits retain the original cancellation regression without timed polling.
+The adapter owns registration and removal of OS I/O sources; this SDK adds no unsafe code.
 
 Payloads use fixed-size chunks with deadline/cancellation checks between reads and writes, including
 already buffered incoming bytes. Caller-supplied payload readers and destinations still own their

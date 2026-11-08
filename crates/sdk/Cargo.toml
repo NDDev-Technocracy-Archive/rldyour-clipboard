@@ -15,6 +15,7 @@ thiserror.workspace = true
 
 [target.'cfg(any(unix, windows))'.dependencies]
 socket2.workspace = true
+async-io.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

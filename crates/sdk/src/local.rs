@@ -1,5 +1,6 @@
 use crate::policy::Policy;
 use crate::{Client, Error};
+use async_io::Async;
 use nddev_clipboard_api::wire::Role;
 use socket2::{Domain, SockAddr, Socket, Type};
 use std::io::{self, Read, Write};
@@ -15,7 +16,7 @@ pub struct LocalOperation {
     policy: Arc<Policy>,
 }
 
-/// Cancels one operation and shuts down its own connected socket.
+/// Cancels one operation, wakes its I/O wait and shuts down its own socket.
 ///
 /// Connect itself is bounded by the deadline; cancellation is checked before
 /// and after it. Cancellation never proves that a sent mutation was undone.
@@ -27,7 +28,7 @@ pub struct Cancellation {
 
 /// An owned pathname AF_UNIX stream; it exposes no raw handles or archive access.
 pub struct LocalTransport {
-    socket: Arc<Socket>,
+    socket: Arc<Async<Socket>>,
     policy: Arc<Policy>,
 }
 
@@ -47,18 +48,17 @@ impl LocalOperation {
     pub fn connect(self, path: &Path, role: Role) -> Result<Client<LocalTransport>, Error> {
         self.policy.remaining().map_err(transport_error)?;
         let address = SockAddr::unix(path).map_err(transport_error)?;
-        let socket =
-            Arc::new(Socket::new(Domain::UNIX, Type::STREAM, None).map_err(transport_error)?);
+        let socket = Socket::new(Domain::UNIX, Type::STREAM, None).map_err(transport_error)?;
+        let result =
+            socket.connect_timeout(&address, self.policy.remaining().map_err(transport_error)?);
+        self.policy.remaining().map_err(transport_error)?;
+        result.map_err(transport_error)?;
+        let socket = Arc::new(Async::new(socket).map_err(transport_error)?);
         self.policy.register(&socket).map_err(transport_error)?;
         let stream = LocalTransport {
             socket,
             policy: self.policy,
         };
-        let result = stream.socket.connect_timeout(
-            &address,
-            stream.policy.remaining().map_err(transport_error)?,
-        );
-        stream.finish(result).map_err(transport_error)?;
         let policy = stream.policy.clone();
         Client::with_policy(stream, role, Some(policy))
     }
@@ -82,17 +82,19 @@ impl LocalTransport {
 
 impl Read for LocalTransport {
     fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
-        self.socket
-            .set_read_timeout(Some(self.policy.remaining()?))?;
-        self.finish((&*self.socket).read(buffer))
+        self.finish(
+            self.policy
+                .wait(self.socket.read_with(|mut socket| socket.read(buffer))),
+        )
     }
 }
 
 impl Write for LocalTransport {
     fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
-        self.socket
-            .set_write_timeout(Some(self.policy.remaining()?))?;
-        self.finish((&*self.socket).write(buffer))
+        self.finish(
+            self.policy
+                .wait(self.socket.write_with(|mut socket| socket.write(buffer))),
+        )
     }
 
     fn flush(&mut self) -> io::Result<()> {
