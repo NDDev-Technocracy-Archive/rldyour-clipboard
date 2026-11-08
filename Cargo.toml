@@ -1,5 +1,5 @@
 [workspace]
-members = ["daemon", "crates/api", "crates/sdk", "crates/platform", "tools/clipboard-tools"]
+members = ["daemon", "crates/api", "crates/sdk", "crates/platform", "crates/files", "tools/clipboard-tools"]
 resolver = "3"
 
 [workspace.package]
@@ -20,6 +20,7 @@ socket2 = "=0.6.5"
 async-io = "=2.6.0"
 utoipa = "=6.0.0"
 sha2 = "=0.11.1"
+tar = { version = "=0.4.46", default-features = false }
 image = { version = "=0.25.10", default-features = false }
 libc = "=0.2.191"
 objc2 = "=0.6.5"

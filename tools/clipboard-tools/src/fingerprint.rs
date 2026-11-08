@@ -8,6 +8,7 @@ pub(crate) const INPUTS: &[&str] = &[
     "daemon/tests/fixtures/baseline-release.json",
     "crates/api",
     "crates/sdk",
+    "crates/files",
     "tools/clipboard-tools",
 ];
 

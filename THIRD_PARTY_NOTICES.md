@@ -8,6 +8,7 @@ The daemon links the following crates. Each is used under its own licence.
 |---|---|---|
 | `rusqlite` (bundled SQLite) | MIT (SQLite itself is public domain) | The archive index and its full-text search. Bundled so the daemon needs nothing from the host. |
 | `sha2` | MIT or Apache-2.0 | Content addresses for blobs, and entry identity. |
+| `tar` | MIT or Apache-2.0 | Standard streaming framing for durable file selections; extraction stays in product-owned checked code. |
 | `serde`, `serde_json` | MIT or Apache-2.0 | Control frames carry user text; hand-rolled string unescaping would be a correctness risk rather than a saving. |
 | `image` | MIT or Apache-2.0 | Thumbnails, and `image/bmp` re-encoding for remote desktops. Optional: `--no-default-features` removes it. |
 | `x11rb` | MIT or Apache-2.0 | X11 protocol bindings — the daemon watches `CLIPBOARD` itself on X11/XRDP sessions. Linux only. |

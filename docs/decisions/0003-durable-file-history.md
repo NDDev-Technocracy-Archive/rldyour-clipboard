@@ -1,7 +1,8 @@
 # Durable file selections in the existing archive
 
-Status: proposed. The product behavior is selected; this storage decision awaits discussion.
-No new archive format, migration or native API permission is accepted by this document.
+Status: accepted, 2026-11-08, after discussion of selection-level deduplication and migration.
+The selected storage is one TAR representation per complete file selection. Native permissions
+and product qualification remain separate requirements.
 
 ## Required behavior
 
@@ -21,8 +22,9 @@ existing content-addressed blob store. Keep the existing v1 streaming transport,
 tables, blob reference accounting, pin durability and garbage collection. The product API owns
 the representation identifier and typed manifest; generated clients consume that definition.
 
-The representation contains a bounded manifest with relative names, hierarchy, lengths and
-content identities, followed by ordinary file bodies under controlled ASCII object names.
+The representation contains a bounded manifest with relative names, hierarchy and lengths,
+followed by ordinary file bodies under controlled ASCII object names and a final digest table.
+Compute the digests during streaming; do not read every source twice to construct the manifest.
 Source-machine absolute paths, ownership, ACLs and executable behavior are not portable content.
 Directory structure and empty files/directories belong to the selection. Capture does not follow
 symlinks, reparse points or special files into other locations. Unsupported names and target
