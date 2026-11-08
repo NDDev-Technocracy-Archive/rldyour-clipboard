@@ -16,7 +16,7 @@ use crate::proto::Summary;
 use blobs::{Blobs, Written};
 use index::{Facts, Index, Part};
 use std::io::{self, Read};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Mutex;
 
 /// How much of a text representation is read back to feed previews and search.
@@ -29,8 +29,6 @@ const INDEXED_TEXT: u64 = 64 * 1024;
 /// The largest representation the daemon will decode looking for a thumbnail.
 /// Past this it records the entry and its dimensions but draws a kind icon.
 const THUMBNAILED_IMAGE: u64 = 64 * 1024 * 1024;
-
-/// Bytes the archive may occupy before the oldest unpinned entries are evicted.
 
 pub struct Store {
     blobs: Blobs,
