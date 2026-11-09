@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [dev, main]
   pull_request:
   # Advisory drift and action rot happen without pushes too.
 
@@ -19,18 +19,18 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
+      - name: Disable external telemetry
+        uses: NDDev-Technocracy-OpenNetwork/nddev-ci/actions/telemetry@52d8302d2272967a21fd8e3ae594205588648777 # v0.6.28
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: cargo fmt --check --manifest-path daemon/Cargo.toml
       - run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y shellcheck
-      - run: shellcheck scripts/*.sh install.sh uninstall.sh install-macos.sh uninstall-macos.sh
-      - run: ./scripts/check-version.sh
-      # The mime tables and the protocol constants exist in three languages;
-      # nothing but this stops them drifting apart.
-      - run: ./scripts/check-consistency.sh
+      - name: Check source and metadata
+        uses: NDDev-Technocracy-OpenNetwork/nddev-ci/actions/recipe@52d8302d2272967a21fd8e3ae594205588648777 # v0.6.28
+        with:
+          recipe: check
 
   daemon:
     name: Daemon (${{ matrix.os }})
@@ -44,14 +44,15 @@ jobs:
       run:
         working-directory: daemon
     steps:
+      - name: Disable external telemetry
+        uses: NDDev-Technocracy-OpenNetwork/nddev-ci/actions/telemetry@52d8302d2272967a21fd8e3ae594205588648777 # v0.6.28
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       # Restores the latest main entry for this OS and architecture on every
       # event; only main saves it, so pull requests never write the cache.
-      - uses: NDDev-Technocracy-Standarts/std-0004-ci-cd-workflows/.github/actions/hosted-cache@c192c6adcf22088abf456635de614d42e8fa3f8d # nddev-cicd-v0.6.20
+      - uses: NDDev-Technocracy-OpenNetwork/nddev-ci/actions/hosted-cache@52d8302d2272967a21fd8e3ae594205588648777 # v0.6.28
         with:
-          ecosystems: cargo
           working-directory: daemon
       # The macOS and Windows capture backends cannot be cross-checked from a
       # Linux workstation: the bundled SQLite needs a C toolchain for the
@@ -72,6 +73,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
+      - name: Disable external telemetry
+        uses: NDDev-Technocracy-OpenNetwork/nddev-ci/actions/telemetry@52d8302d2272967a21fd8e3ae594205588648777 # v0.6.28
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -83,6 +86,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
+      - name: Disable external telemetry
+        uses: NDDev-Technocracy-OpenNetwork/nddev-ci/actions/telemetry@52d8302d2272967a21fd8e3ae594205588648777 # v0.6.28
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -106,6 +111,8 @@ jobs:
         os: [ubuntu-24.04, macos-26, macos-26-intel, windows-2025]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Disable external telemetry
+        uses: NDDev-Technocracy-OpenNetwork/nddev-ci/actions/telemetry@52d8302d2272967a21fd8e3ae594205588648777 # v0.6.28
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -173,6 +180,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
+      - name: Disable external telemetry
+        uses: NDDev-Technocracy-OpenNetwork/nddev-ci/actions/telemetry@52d8302d2272967a21fd8e3ae594205588648777 # v0.6.28
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -199,6 +208,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
+      - name: Disable external telemetry
+        uses: NDDev-Technocracy-OpenNetwork/nddev-ci/actions/telemetry@52d8302d2272967a21fd8e3ae594205588648777 # v0.6.28
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -213,36 +224,21 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
+      - name: Disable external telemetry
+        uses: NDDev-Technocracy-OpenNetwork/nddev-ci/actions/telemetry@52d8302d2272967a21fd8e3ae594205588648777 # v0.6.28
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: cargo install cargo-audit --version 0.22.1 --locked
+      - name: Prepare the declared advisory tool
+        uses: NDDev-Technocracy-OpenNetwork/nddev-ci/actions/hosted-sdk@52d8302d2272967a21fd8e3ae594205588648777 # v0.6.28
+        with:
+          tools: cargo-audit@0.22.1
       - run: cargo audit
         working-directory: daemon
 
   workflows:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - uses: NDDev-Technocracy-Standarts/std-0004-ci-cd-workflows/.github/actions/tools@c192c6adcf22088abf456635de614d42e8fa3f8d # nddev-cicd-v0.6.20
-        with:
-          capability: security
-      - name: Lint and audit workflows
-        run: |
-          actionlint
-          zizmor --offline --no-progress .github/workflows/ci.yml .github/dependabot.yml
-      - name: Scan new pull request commits, or the full history on main
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD: ${{ github.event.pull_request.head.sha }}
-        run: |
-          if [ -n "$BASE" ]; then
-            gitleaks git --no-banner --redact --log-opts="$BASE..$HEAD" .
-          else
-            gitleaks git --no-banner --redact .
-          fi
-
+    uses: NDDev-Technocracy-OpenNetwork/nddev-ci/.github/workflows/merge-stops.yml@52d8302d2272967a21fd8e3ae594205588648777 # v0.6.28
+    permissions:
+      contents: read
+    with:
+      hosted-runner: ubuntu-24.04
