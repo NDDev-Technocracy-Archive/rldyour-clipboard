@@ -147,14 +147,11 @@ export type Response = {
     ev: 'blob';
     mime: string;
     req: number;
-} | {
-    bytes: number;
-    ev: 'thumb';
-    height: number;
+} | (ThumbnailInfo & {
     req: number;
-    stride: number;
-    width: number;
-} | (ArchiveStats & {
+} & {
+    ev: 'thumb';
+}) | (ArchiveStats & {
     req: number;
 } & {
     ev: 'stats';
@@ -193,6 +190,16 @@ export type Summary = {
     source?: string | null;
     thumb: boolean;
     width?: number | null;
+};
+
+/**
+ * Geometry and exact payload length of tightly packed straight RGBA pixels.
+ */
+export type ThumbnailInfo = {
+    bytes: number;
+    height: number;
+    stride: number;
+    width: number;
 };
 
 export type View = 'recent' | 'history' | 'favorites';

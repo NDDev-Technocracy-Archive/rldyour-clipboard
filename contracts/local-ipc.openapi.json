@@ -743,49 +743,40 @@
             "type": "object"
           },
           {
-            "description": "A thumbnail, as straight RGBA followed by `bytes` raw bytes.\n\nSeparate from `blob` because it is pixels rather than a file: the only\nway a GNOME Shell extension can draw arbitrary image data is to hand\n`St.ImageContent` a buffer and its geometry, so the geometry travels\nwith it rather than having to be decoded out of a container.",
-            "properties": {
-              "bytes": {
-                "format": "int64",
-                "minimum": 0,
-                "type": "integer"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ThumbnailInfo"
               },
-              "ev": {
-                "enum": [
-                  "thumb"
+              {
+                "properties": {
+                  "req": {
+                    "format": "int64",
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "req"
                 ],
-                "type": "string"
+                "type": "object"
               },
-              "height": {
-                "format": "int32",
-                "minimum": 0,
-                "type": "integer"
-              },
-              "req": {
-                "format": "int64",
-                "minimum": 0,
-                "type": "integer"
-              },
-              "stride": {
-                "format": "int32",
-                "minimum": 0,
-                "type": "integer"
-              },
-              "width": {
-                "format": "int32",
-                "minimum": 0,
-                "type": "integer"
+              {
+                "description": "A thumbnail, as straight RGBA followed by `bytes` raw bytes.\n\nSeparate from `blob` because it is pixels rather than a file: the only\nway a GNOME Shell extension can draw arbitrary image data is to hand\n`St.ImageContent` a buffer and its geometry, so the geometry travels\nwith it rather than having to be decoded out of a container.",
+                "properties": {
+                  "ev": {
+                    "enum": [
+                      "thumb"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "ev"
+                ],
+                "type": "object"
               }
-            },
-            "required": [
-              "req",
-              "width",
-              "height",
-              "stride",
-              "bytes",
-              "ev"
             ],
-            "type": "object"
+            "description": "A thumbnail, as straight RGBA followed by `bytes` raw bytes.\n\nSeparate from `blob` because it is pixels rather than a file: the only\nway a GNOME Shell extension can draw arbitrary image data is to hand\n`St.ImageContent` a buffer and its geometry, so the geometry travels\nwith it rather than having to be decoded out of a container."
           },
           {
             "allOf": [
@@ -997,6 +988,38 @@
           "thumb",
           "pinned",
           "at"
+        ],
+        "type": "object"
+      },
+      "ThumbnailInfo": {
+        "description": "Geometry and exact payload length of tightly packed straight RGBA pixels.",
+        "properties": {
+          "bytes": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "height": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "stride": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "width": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "width",
+          "height",
+          "stride",
+          "bytes"
         ],
         "type": "object"
       },
