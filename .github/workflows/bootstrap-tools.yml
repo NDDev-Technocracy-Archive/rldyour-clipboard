@@ -38,6 +38,7 @@ jobs:
           cargo clippy --locked -p nddev-clipboard-api -p nddev-clipboard-sdk -p nddev-clipboard -p nddev-clipboard-platform -p nddev-clipboard-files -p clipboard-tools --all-targets -- -D warnings
           cargo build --locked -p clipboard-tools
           target/debug/clipboard-tools generate
+          target/debug/clipboard-tools check-version
       - name: Prepare the source verifier artifact
         if: runner.os == 'Linux'
         shell: bash

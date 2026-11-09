@@ -14,7 +14,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Gate everything on the tag matching every published version string,
       # before any runner spends a minute building.
-      - run: ./scripts/check-version.sh "${GITHUB_REF_NAME}"
+      - run: cargo build --locked -p clipboard-tools
+      - run: target/debug/clipboard-tools check-version "${GITHUB_REF_NAME}"
 
   linux:
     needs: verify

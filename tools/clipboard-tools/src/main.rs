@@ -25,6 +25,7 @@ mod notices;
 mod platform_client;
 mod qualification;
 mod upgrade_fixture;
+mod version;
 
 fn main() -> std::process::ExitCode {
     let result = run();
@@ -38,9 +39,14 @@ fn main() -> std::process::ExitCode {
 }
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let command = std::env::args()
-        .nth(1)
+    let mut arguments = std::env::args().skip(1);
+    let command = arguments
+        .next()
         .ok_or("expected a clipboard-tools command")?;
+    let argument = arguments.next();
+    if arguments.next().is_some() || (argument.is_some() && command != "check-version") {
+        return Err("unexpected clipboard-tools argument".into());
+    }
     let root = std::env::current_dir()?.canonicalize()?;
     let manifest: toml::Value = toml::from_str(&std::fs::read_to_string(root.join("Cargo.toml"))?)?;
     let package = &manifest["workspace"]["package"];
@@ -55,6 +61,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         "generate" => generated(&root, true),
         "check-extension" => Ok(extension::check(&root)?),
         "bundle-tool-notices" => Ok(notices::bundle(&root)?),
+        "check-version" => Ok(version::check(&root, &manifest, argument.as_deref())?),
         "prepare-upgrade-fixture" => upgrade_fixture::prepare(&root),
         "qualify-platform-client" => platform_client::qualify(&root),
         "qualify-native-client" => native_client::qualify(&root),

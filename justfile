@@ -9,6 +9,7 @@ check:
     cargo deny --locked --all-features check
     cargo shear --locked --deny-warnings
     .tools/bin/clipboard-tools check
+    .tools/bin/clipboard-tools check-version
     .tools/bin/clipboard-tools check-extension
     cd ui && bun run check
 

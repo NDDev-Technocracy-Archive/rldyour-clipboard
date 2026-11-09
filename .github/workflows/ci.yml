@@ -27,7 +27,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y shellcheck
       - run: shellcheck scripts/*.sh install.sh uninstall.sh install-macos.sh uninstall-macos.sh
-      - run: ./scripts/check-version.sh
+      - run: cargo build --locked -p clipboard-tools
+      - run: target/debug/clipboard-tools check-version
       # The mime tables and the protocol constants exist in three languages;
       # nothing but this stops them drifting apart.
       - run: ./scripts/check-consistency.sh
