@@ -21,6 +21,7 @@ struct LocalContract;
 mod extension;
 mod fingerprint;
 mod native_client;
+mod notices;
 mod platform_client;
 mod qualification;
 mod upgrade_fixture;
@@ -53,6 +54,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         "check" => generated(&root, false),
         "generate" => generated(&root, true),
         "check-extension" => Ok(extension::check(&root)?),
+        "bundle-tool-notices" => Ok(notices::bundle(&root)?),
         "prepare-upgrade-fixture" => upgrade_fixture::prepare(&root),
         "qualify-platform-client" => platform_client::qualify(&root),
         "qualify-native-client" => native_client::qualify(&root),

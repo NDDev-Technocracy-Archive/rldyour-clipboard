@@ -19,6 +19,16 @@ The daemon links the following crates. Each is used under its own licence.
 
 The Python client depends on nothing outside the standard library.
 
+The source-verification tool also uses `regex` (MIT or Apache-2.0), with
+`regex-automata`, `regex-syntax` and `aho-corasick` (MIT alternative), for the
+retained GNOME client's static rules. It does not link these into the daemon.
+Its artifact includes the actual Cargo dependency graph's license expressions,
+upstream texts and notices in `cargo-dependency-notices.json` and
+`dependency-licenses/`. The inventory follows normal and build edges for that
+binary target and excludes dev-only edges. It preserves dual-license texts
+without changing upstream terms. Product release packaging has a separate
+inventory covering its native binaries, UI assets and platform dependencies.
+
 GNOME Shell, GJS, the operating-system frameworks and separately installed desktop
 tools are not bundled with the product. See [distribution licenses](docs/licenses.md)
 for the GNOME integration's compatibility boundary. Package archives must include
