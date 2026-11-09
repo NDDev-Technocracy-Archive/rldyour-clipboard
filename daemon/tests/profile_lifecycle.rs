@@ -881,10 +881,12 @@ fn sdk_thumbnail_pixels_and_transcoded_images_keep_the_original_archive_bytes() 
         (256, 128, 1024, 131_072)
     );
     assert_eq!(pixels.len() as u64, geometry.bytes);
+    let (pixels, remainder) = pixels.as_chunks::<4>();
+    assert!(remainder.is_empty());
     assert!(
         pixels
-            .chunks_exact(4)
-            .all(|pixel| pixel == [0x12, 0x34, 0x56, 0xff])
+            .iter()
+            .all(|pixel| *pixel == [0x12, 0x34, 0x56, 0xff])
     );
     let mut bmp = Vec::new();
     let blob = client
