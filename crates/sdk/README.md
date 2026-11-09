@@ -25,8 +25,10 @@ own blocking behavior; the SDK cannot interrupt an arbitrary external reader or 
 or cancellation closes the local connection and prevents reuse. It does not prove that a previously
 sent mutation was undone; reconcile the resulting archive state before repeating uncertain work.
 
-The client negotiates without broadcasts and serializes requests. It lists history and favorites,
-pins entries, records multiple streamed representations, aborts drafts and streams fetched data
+The client negotiates without broadcasts and serializes requests. `ListQuery` selects the provider's
+limit, cursor, text, kind and pinned filters; omitted fields retain provider defaults. The client
+lists history and favorites, pins/removes entries, clears unpinned history, reads shared typed
+archive statistics, records multiple streamed representations, aborts drafts and streams fetched data
 into a caller-owned writer. Control frames have a fixed bound; payloads do not pass through a
 complete in-memory SDK buffer. The SDK keeps exact 64-bit entry IDs in Rust.
 
@@ -45,6 +47,14 @@ File-selection encoding can therefore stream straight to the daemon without an i
 Truncated data, I/O failures and unexpected frames invalidate the connection. Drop that client
 so the daemon releases any draft. A matching remote request error preserves the connection.
 Protocol errors contain no copied content or remote diagnostic message.
+
+`LocalOperation::subscribe` uses a dedicated connection with the same absolute deadline and
+cancellation policy. `Subscription::greeting` exposes its validated v1 Hello and current provider
+policy. `next_event` accepts only Added, Updated, Removed and Cleared frames; an unexpected reply
+invalidates the subscription. It exposes no mutation/request methods and cannot interleave a
+broadcast with a request acknowledgement. A successful greeting establishes notification readiness:
+the provider owns the subscription before publishing Hello and orders later frames behind it.
+There is no replay or reconnect guarantee. After disconnect, reconcile a new archive listing.
 
 Qualification includes malformed/truncated streams, real pathname sockets with a stalled greeting
 or continual partial progress, cancellation, and actual daemon processes with private synthetic

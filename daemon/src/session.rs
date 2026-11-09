@@ -12,7 +12,7 @@
 //!   the middle of a blob and every later frame would be nonsense.
 
 use crate::kind::Kind;
-use crate::outbox::{Outbox, Watchers};
+use crate::outbox::{Outbox, Subscription, Watchers};
 use crate::proto::{self, Request, Response, Role, code};
 use crate::store::{Accepted, Store, StoreError};
 use nddev_clipboard_api::wire::ArchiveStats;
@@ -32,7 +32,7 @@ pub(crate) struct Session {
     out: Arc<Outbox>,
     watchers: Arc<Watchers>,
     role: Role,
-    watch: bool,
+    _subscription: Option<Subscription>,
     drafts: HashMap<u64, Draft>,
     next_draft: u64,
 }
@@ -52,14 +52,10 @@ impl Session {
             out,
             watchers,
             role: Role::default(),
-            watch: true,
+            _subscription: None,
             drafts: HashMap::new(),
             next_draft: 1,
         }
-    }
-
-    pub(crate) fn watches(&self) -> bool {
-        self.role.watches() && self.watch
     }
 
     /// Reads the opening frame and answers it.
@@ -74,15 +70,22 @@ impl Session {
         match proto::decode(&line) {
             Ok(Request::Hello { v, role, watch }) if v == proto::PROTOCOL_VERSION => {
                 self.role = role;
-                self.watch = watch;
                 let (entries, _pinned, bytes) = self.store.stats().unwrap_or((0, 0, 0));
-                self.out.send(&Response::Hello {
+                let greeting = Response::Hello {
                     v: proto::PROTOCOL_VERSION,
                     entries,
                     bytes,
                     budget: self.store.budget(),
                     retention_days: self.store.retention_days(),
-                })?;
+                };
+                if role.watches() && watch {
+                    self._subscription = Some(
+                        self.out
+                            .subscribe_with_greeting(&self.watchers, &greeting)?,
+                    );
+                } else {
+                    self.out.send(&greeting)?;
+                }
                 Ok(true)
             }
             Ok(Request::Hello { v, .. }) => {

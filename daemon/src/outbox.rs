@@ -13,6 +13,18 @@ struct Writer {
     stream: Stream,
     frame: Vec<u8>,
 }
+impl Writer {
+    fn send(&mut self, response: &Response) -> io::Result<()> {
+        response.encode(&mut self.frame);
+        if self.frame.len() > MAX_FRAME {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "outgoing control frame exceeds protocol limit",
+            ));
+        }
+        self.stream.write_all(&self.frame)
+    }
+}
 pub(crate) struct Outbox {
     writer: Mutex<Writer>,
     shutdown: Option<Stream>,
@@ -36,16 +48,22 @@ impl Outbox {
         }
     }
     pub(crate) fn send(&self, response: &Response) -> io::Result<()> {
+        self.writer.lock().map_err(poisoned)?.send(response)
+    }
+
+    /// Register before making readiness visible. The writer lock keeps queued
+    /// notifications behind the greeting, including concurrent capture events.
+    pub(crate) fn subscribe_with_greeting(
+        self: &Arc<Self>,
+        watchers: &Watchers,
+        greeting: &Response,
+    ) -> io::Result<Subscription> {
         let mut writer = self.writer.lock().map_err(poisoned)?;
-        let Writer { stream, frame } = &mut *writer;
-        response.encode(frame);
-        if frame.len() > MAX_FRAME {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "outgoing control frame exceeds protocol limit",
-            ));
-        }
-        stream.write_all(frame)
+        let subscription = watchers.add(self).ok_or_else(|| {
+            io::Error::other("notification subscription could not be established")
+        })?;
+        writer.send(greeting)?;
+        Ok(subscription)
     }
     pub(crate) fn send_blob(
         &self,

@@ -131,7 +131,18 @@ pub(crate) fn qualify(root: &Path) -> Result<()> {
     };
     let small = b"native CLI synthetic \x1b[31m\n\"quoted\"";
     let large = vec![b'x'; 3 * 1024 * 1024];
-    let first = record(&mut writer, small)?;
+    let binary_representation = b"\x00\xff\x80\xfe\r\n\x1a\x00";
+    let draft = writer.begin(Some("native CLI qualification"))?;
+    let mut text_input = small.as_slice();
+    writer.part_from(draft, "text/plain", small.len() as u64, &mut text_input)?;
+    let mut binary_input = binary_representation.as_slice();
+    writer.part_from(
+        draft,
+        "application/octet-stream",
+        binary_representation.len() as u64,
+        &mut binary_input,
+    )?;
+    let first = writer.commit(draft)?;
     let second = record(&mut writer, &large)?;
     let first_key = first.to_string();
     let second_key = second.to_string();
@@ -167,6 +178,18 @@ pub(crate) fn qualify(root: &Path) -> Result<()> {
     require(
         fixture.output(&[OsStr::new("get"), OsStr::new(&second_key)], true)? == large,
         "CLI large retrieval changed the original bytes",
+    )?;
+    require(
+        fixture.output(
+            &[
+                OsStr::new("get"),
+                OsStr::new(&first_key),
+                OsStr::new("--mime"),
+                OsStr::new("application/octet-stream"),
+            ],
+            true,
+        )? == binary_representation,
+        "CLI binary output changed non-UTF-8 representation bytes",
     )?;
     fixture.json(&["pin", &first_key])?;
     let page = fixture.json(&["list", "--favorites"])?;

@@ -69,6 +69,12 @@ role it takes:
 UI/both connections: this avoids unsolicited events and a notification worker.
 Capture-only connections never subscribe.
 
+For a subscribed connection, a successful Hello establishes notification readiness.
+The daemon registers the subscription before publishing that greeting and serializes
+queued notifications behind it. A mutation after the client reads Hello can therefore
+produce a notification immediately, without a second handshake or a delay. This is a
+live event stream, with no replay guarantee after disconnection.
+
 The daemon answers with the archive's current shape:
 
 ```json

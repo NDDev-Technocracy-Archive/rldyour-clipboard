@@ -118,8 +118,6 @@ fn serve(stream: Stream, store: Arc<store::Store>, watchers: Arc<Watchers>) {
     }
 
     let _ = input.get_ref().set_read_timeout(None);
-    let _subscription = session.watches().then(|| watchers.add(&out));
-
     if let Err(error) = session.run(&mut input) {
         // A peer that closed mid-conversation is the ordinary way a session
         // ends, not a fault worth reporting.

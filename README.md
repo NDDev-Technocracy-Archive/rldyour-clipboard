@@ -35,7 +35,8 @@ successive wakes. Cleanup removes metadata, search rows and unreferenced blobs.
 | Rust `capture` | Native macOS/Windows watchers; X11 XFIXES on Linux |
 | GNOME extension | Wayland selection access, async streaming, picker and restore |
 | macOS AppKit client | Menu, search, paging, pinning, multi-format restore |
-| Python client | Dependency-free protocol API and streaming CLI |
+| Native Rust client | Shared wire types, streaming SDK and finite command/subscription lifetimes |
+| Python client | Retained release API under migration |
 | Shared `ui` | History window under development, with public design assets and a synthetic browser harness |
 
 The daemon streams blob I/O in 64 KiB chunks. Thumbnail/image work is serialized
@@ -154,29 +155,34 @@ only when no native watcher is active. Keep the archive on a local filesystem.
 
 [The protocol specification](docs/protocol.md) describes version 1. Optional
 `watch:false`, retention metadata and pagination `more` are compatible additions.
-Python/CLI uses standard Unix sockets on Linux/macOS (CPython does not expose
-AF_UNIX on Windows); Windows clients can use .NET Unix-domain sockets instead.
+The [Rust SDK](crates/sdk) consumes the same typed messages as the daemon. It supports
+filtered history, favorites, statistics, management, streamed recording/retrieval and a separate
+notification subscription. A caller supplies its own transport or uses `LocalOperation` with
+an explicit pathname, absolute deadline and cancellation handle on Windows, macOS and Linux.
+Payload readers and destinations retain their own blocking policy. The SDK owns no archive or
+collector. [Integration](docs/integration.md) defines the product boundary.
 
-The new [Rust SDK](crates/sdk) consumes the same Rust wire types as the daemon. It lists and pins
-entries, records streamed representations and fetches them into a writer. A caller can supply
-its own connected transport or use `LocalOperation` with an explicit pathname, absolute deadline
-and cancellation handle. Payload readers and destinations retain their own blocking policy.
-The SDK owns no archive or collector. [Integration](docs/integration.md) defines the external
-product boundary.
+The new [native CLI](crates/cli) belongs to this unreleased source migration. Build it on an
+execution host with `cargo build --locked -p nddev-clipboard` and select the daemon's complete
+[TOML profile](docs/configuration.md):
 
 ```sh
-uv tool install ./rldyour_clipboard-*.whl
-rldyour-clipboard list --favorites
-rldyour-clipboard pin 42
-rldyour-clipboard unpin 42
-rldyour-clipboard get 42 > restored.png
+nddev-clipboard --config /absolute/clipboard.toml list --favorites
+nddev-clipboard --config /absolute/clipboard.toml pin 42
+nddev-clipboard --config /absolute/clipboard.toml unpin 42
+nddev-clipboard --config /absolute/clipboard.toml get 42 --mime image/png > restored.png
+nddev-clipboard --config /absolute/clipboard.toml watch --seconds 30
 ```
 
-Python `list()`/`favorites()` return list-compatible pages with a `.more` flag;
-follow it and use the last entry ID as `before`, because frame-size bounds can
-trim a page below the requested limit. `get` streams output; the Python `Client.fetch()` convenience method returns
-bytes, while `fetch_to()` streams to a destination. `clear` keeps pins;
-explicit `remove` can delete a pinned record.
+Control output is escaped JSON. Pages include an exact decimal `key`; pass it back as the ID.
+Follow `more` and use the last key as `--before`, because frame-size bounds can trim a page below
+the requested limit. `get` streams raw output. Clear preserves favorites; explicit remove can
+delete a favorite. A watch emits its validated Hello first and then native archive events for
+its finite observation lifetime, with no reconnect or replay promise.
+
+The legacy Python API and wheel remain for existing release callers while packaging, CI and
+installation migrate. Their retained `fetch_to()` streams output; `Client.fetch()` returns bytes.
+They are not the native Windows client, and the new Rust command is not yet a released asset.
 
 ## Validation
 
