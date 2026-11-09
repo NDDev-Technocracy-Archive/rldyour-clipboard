@@ -54,6 +54,9 @@ creation on each native target; it does not migrate archive permissions or selec
 transfer ownership. Existing archives are never implicitly hardened.
 Keep the Windows occupied-path preservation regression enabled; its failure blocks release.
 The temporary branch workflows do not qualify installation or replace the final delivery gates.
+`clipboard-tools release-checksums <relative-directory>` owns flat release manifests. It streams
+prepared regular files, skips untraversed subdirectories and replaces `SHA256SUMS` after complete
+validation. Use only quiescent build outputs owned by the caller; it is not an archive/export API.
 
 ADR 0001 permits only the small native boundary for service-manager listener acquisition and
 the Windows endpoint tag query. It does not retain the legacy unsafe capture implementation.

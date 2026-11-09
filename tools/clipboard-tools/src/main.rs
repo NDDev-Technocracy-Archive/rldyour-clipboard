@@ -18,6 +18,7 @@ use utoipa::OpenApi;
 )))]
 struct LocalContract;
 
+mod checksums;
 mod extension;
 mod fingerprint;
 mod native_client;
@@ -44,7 +45,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .next()
         .ok_or("expected a clipboard-tools command")?;
     let argument = arguments.next();
-    if arguments.next().is_some() || (argument.is_some() && command != "check-version") {
+    if arguments.next().is_some()
+        || (argument.is_some()
+            && !matches!(command.as_str(), "check-version" | "release-checksums"))
+    {
         return Err("unexpected clipboard-tools argument".into());
     }
     let root = std::env::current_dir()?.canonicalize()?;
@@ -62,6 +66,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         "check-extension" => Ok(extension::check(&root)?),
         "bundle-tool-notices" => Ok(notices::bundle(&root)?),
         "check-version" => Ok(version::check(&root, &manifest, argument.as_deref())?),
+        "release-checksums" => checksums::write(
+            &root,
+            Path::new(
+                argument
+                    .as_deref()
+                    .ok_or("expected an artifact directory")?,
+            ),
+        ),
         "prepare-upgrade-fixture" => upgrade_fixture::prepare(&root),
         "qualify-platform-client" => platform_client::qualify(&root),
         "qualify-native-client" => native_client::qualify(&root),

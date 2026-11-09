@@ -66,3 +66,12 @@ Release builds use Cargo.lock (`--locked`) and SHA-pinned Actions. A release
 version gate checks daemon/Python/changelog agreement before building, and
 checksums accompany all GitHub release assets. Python is dependency-free at
 runtime; image decoding remains an optional Rust feature.
+
+The current source tool owns flat release checksums through
+`clipboard-tools release-checksums <relative-directory>`. It hashes files in
+bounded buffers, refuses ambiguous names and redirected inputs, excludes the
+manifest and leaves subdirectories untraversed. Publication replaces the manifest
+after all inputs succeed. The source-tool producer independently verifies its
+manifest with `sha256sum --check`. This source migration does not qualify the
+remaining legacy packaging, installers or final release workflow; those remain
+part of #14.

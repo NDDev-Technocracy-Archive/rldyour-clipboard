@@ -49,8 +49,9 @@ jobs:
           cp contracts/local-ipc.openapi.json .build/source-tool/
           git rev-parse HEAD > .build/source-tool/source-commit
           target/debug/clipboard-tools bundle-tool-notices
+          target/debug/clipboard-tools release-checksums .build/source-tool
           cd .build/source-tool
-          sha256sum clipboard-tools config.schema.json local-ipc.openapi.json source-commit LICENSE NOTICE THIRD_PARTY_NOTICES.md cargo-dependency-notices.json > SHA256SUMS
+          sha256sum --strict --check SHA256SUMS
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: runner.os == 'Linux'
         with:
