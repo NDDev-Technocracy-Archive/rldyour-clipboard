@@ -1,6 +1,42 @@
 {
   "components": {
     "schemas": {
+      "ArchiveStats": {
+        "description": "Current archive policy and counters, shared by the wire and native clients.",
+        "properties": {
+          "budget": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "bytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "entries": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "pinned": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "retention_days": {
+            "format": "int64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "entries",
+          "pinned",
+          "bytes",
+          "budget"
+        ],
+        "type": "object"
+      },
       "DesktopAction": {
         "oneOf": [
           {
@@ -752,53 +788,38 @@
             "type": "object"
           },
           {
-            "properties": {
-              "budget": {
-                "format": "int64",
-                "type": "integer"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ArchiveStats"
               },
-              "bytes": {
-                "format": "int64",
-                "type": "integer"
-              },
-              "entries": {
-                "format": "int64",
-                "type": "integer"
-              },
-              "ev": {
-                "enum": [
-                  "stats"
+              {
+                "properties": {
+                  "req": {
+                    "format": "int64",
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "req"
                 ],
-                "type": "string"
+                "type": "object"
               },
-              "pinned": {
-                "description": "How many of them are pinned — the favourites.",
-                "format": "int64",
-                "type": "integer"
-              },
-              "req": {
-                "format": "int64",
-                "minimum": 0,
-                "type": "integer"
-              },
-              "retention_days": {
-                "format": "int64",
-                "minimum": 0,
-                "type": [
-                  "integer",
-                  "null"
-                ]
+              {
+                "properties": {
+                  "ev": {
+                    "enum": [
+                      "stats"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "ev"
+                ],
+                "type": "object"
               }
-            },
-            "required": [
-              "req",
-              "entries",
-              "pinned",
-              "bytes",
-              "budget",
-              "ev"
-            ],
-            "type": "object"
+            ]
           },
           {
             "properties": {

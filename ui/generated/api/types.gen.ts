@@ -4,6 +4,17 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+/**
+ * Current archive policy and counters, shared by the wire and native clients.
+ */
+export type ArchiveStats = {
+    budget: number;
+    bytes: number;
+    entries: number;
+    pinned: number;
+    retention_days?: number | null;
+};
+
 export type DesktopAction = {
     action: 'browse';
     before?: string | null;
@@ -143,18 +154,11 @@ export type Response = {
     req: number;
     stride: number;
     width: number;
-} | {
-    budget: number;
-    bytes: number;
-    entries: number;
-    ev: 'stats';
-    /**
-     * How many of them are pinned — the favourites.
-     */
-    pinned: number;
+} | (ArchiveStats & {
     req: number;
-    retention_days?: number | null;
-} | {
+} & {
+    ev: 'stats';
+}) | {
     entry: Summary;
     ev: 'added';
 } | {
