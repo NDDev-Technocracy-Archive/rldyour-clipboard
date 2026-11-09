@@ -7,7 +7,7 @@
 //! Interrupted or malformed exchanges invalidate the connection so leftover
 //! payload bytes can never be interpreted as another response.
 use nddev_clipboard_api::wire::{
-    ArchiveStats, MAX_FRAME, PROTOCOL_VERSION, Request, Response, Role, Summary,
+    ArchiveStats, MAX_FRAME, PROTOCOL_VERSION, Request, Response, Role, Summary, ThumbnailInfo,
 };
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::sync::Arc;
@@ -186,6 +186,50 @@ impl<T: Read + Write> Client<T> {
         }
     }
 
+    /// Record an input whose final length is unknown. An input failure closes
+    /// this connection without a successful chunk terminator or publication.
+    pub fn part_chunks_from(
+        &mut self,
+        draft: u64,
+        mime: &str,
+        input: &mut impl Read,
+    ) -> Result<(), Error> {
+        control_text(Some(mime))?;
+        let req = self.request_id()?;
+        self.send(&Request::Part {
+            req,
+            draft,
+            mime: mime.to_owned(),
+            bytes: None,
+        })?;
+        let mut buffer = [0; 8192];
+        let mut total = 0_u64;
+        loop {
+            self.check()?;
+            let length = match input.read(&mut buffer) {
+                Ok(length) => length,
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+                Err(error) => return self.invalidate(Error::Transport(error.kind())),
+            };
+            self.check()?;
+            let bytes = length as u64;
+            let Some(next) = total
+                .checked_add(bytes)
+                .filter(|bytes| *bytes <= i64::MAX as u64)
+            else {
+                return self.invalidate(Error::InvalidFrame);
+            };
+            self.send(&Request::Chunk { bytes })?;
+            if length == 0 {
+                return self.expect_ok(req);
+            }
+            if let Err(error) = self.stream.get_mut().write_all(&buffer[..length]) {
+                return self.invalidate(Error::Transport(error.kind()));
+            }
+            total = next;
+        }
+    }
+
     /// Borrow the connection while an encoder writes one declared representation.
     /// `finish` is required to consume the acknowledgement before another request.
     pub fn part_writer(
@@ -240,6 +284,37 @@ impl<T: Read + Write> Client<T> {
                 reader.client.invalidate(Error::TruncatedPayload)
             }
             Err(error) => reader.client.invalidate(Error::Transport(error.kind())),
+        }
+    }
+
+    /// Stream tightly packed straight RGBA to a caller-owned destination.
+    /// Geometry is checked before receiving pixels; failure prevents reuse.
+    pub fn thumbnail_to(
+        &mut self,
+        entry: i64,
+        output: &mut impl Write,
+    ) -> Result<ThumbnailInfo, Error> {
+        let req = self.request_id()?;
+        self.send(&Request::Thumb { req, entry })?;
+        let Response::Thumb { info, .. } = self.answer(req)? else {
+            return self.invalidate(Error::UnexpectedResponse);
+        };
+        if info.width == 0
+            || info.height == 0
+            || info.width.checked_mul(4) != Some(info.stride)
+            || u64::from(info.height) * u64::from(info.stride) != info.bytes
+            || info.bytes > i64::MAX as u64
+        {
+            return self.invalidate(Error::InvalidFrame);
+        }
+        let policy = self.policy.clone();
+        match policy::copy(&mut self.stream, output, info.bytes, policy.as_deref()) {
+            Ok(bytes) if bytes == info.bytes => {
+                self.check()?;
+                Ok(info)
+            }
+            Ok(_) => self.invalidate(Error::TruncatedPayload),
+            Err(error) => self.invalidate(Error::Transport(error.kind())),
         }
     }
 

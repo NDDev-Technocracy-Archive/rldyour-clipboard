@@ -9,6 +9,7 @@ use utoipa::OpenApi;
     wire::Response,
     wire::Summary,
     wire::ArchiveStats,
+    wire::ThumbnailInfo,
     wire::Role,
     desktop::View,
     desktop::DesktopAction,

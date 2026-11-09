@@ -1,6 +1,6 @@
 //! Adversarial peers exercise framing and connection reuse, never an OS clipboard.
 use nddev_clipboard_api::wire::{MAX_FRAME, Role};
-use nddev_clipboard_sdk::{Client, Error, ListQuery};
+use nddev_clipboard_sdk::{Client, Error, ListQuery, Subscription};
 use std::io::{self, Cursor, Read, Write};
 
 struct Peer {
@@ -21,20 +21,56 @@ impl Write for Peer {
     }
 }
 
-fn client(responses: &[u8]) -> Client<Peer> {
+fn peer(responses: &[u8]) -> Peer {
     let mut input =
         br#"{"ev":"hello","v":1,"entries":0,"bytes":0,"budget":1024,"retention_days":null}"#
             .to_vec();
     input.push(b'\n');
     input.extend_from_slice(responses);
-    Client::new(
-        Peer {
-            input: Cursor::new(input),
-            output: Vec::new(),
-        },
-        Role::Both,
-    )
-    .unwrap()
+    Peer {
+        input: Cursor::new(input),
+        output: Vec::new(),
+    }
+}
+
+fn client(responses: &[u8]) -> Client<Peer> {
+    Client::new(peer(responses), Role::Both).unwrap()
+}
+
+#[test]
+fn notification_ownership_rejects_a_request_reply_and_prevents_reuse() {
+    let mut subscription = Subscription::new(peer(b"{\"ev\":\"ok\",\"req\":1}\n")).unwrap();
+    assert!(matches!(
+        subscription.next_event(),
+        Err(Error::UnexpectedResponse)
+    ));
+    assert!(matches!(subscription.next_event(), Err(Error::Closed)));
+}
+
+#[test]
+fn malformed_thumbnail_geometry_cannot_write_pixels_or_reuse_the_connection() {
+    let mut client = client(b"{\"ev\":\"thumb\",\"req\":1,\"width\":4294967295,\"height\":1,\"stride\":4,\"bytes\":4}\n1234");
+    let mut pixels = Vec::new();
+    assert!(matches!(
+        client.thumbnail_to(1, &mut pixels),
+        Err(Error::InvalidFrame)
+    ));
+    assert!(pixels.is_empty());
+    assert!(matches!(client.pin(1, true), Err(Error::Closed)));
+}
+
+#[test]
+fn thumbnail_pixels_stop_before_a_prefetched_control_frame() {
+    let mut responses =
+        b"{\"ev\":\"thumb\",\"req\":1,\"width\":1,\"height\":1,\"stride\":4,\"bytes\":4}\n"
+            .to_vec();
+    responses.extend_from_slice(&[0xff, b'\n', 0, 3]);
+    responses.extend_from_slice(b"{\"ev\":\"ok\",\"req\":2}\n");
+    let mut client = client(&responses);
+    let mut pixels = Vec::new();
+    assert_eq!(client.thumbnail_to(1, &mut pixels).unwrap().bytes, 4);
+    assert_eq!(pixels, [0xff, b'\n', 0, 3]);
+    client.pin(1, true).unwrap();
 }
 
 #[test]

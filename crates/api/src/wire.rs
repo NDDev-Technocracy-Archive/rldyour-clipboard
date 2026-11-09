@@ -180,6 +180,15 @@ pub struct ArchiveStats {
     pub retention_days: Option<u64>,
 }
 
+/// Geometry and exact payload length of tightly packed straight RGBA pixels.
+#[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
+pub struct ThumbnailInfo {
+    pub width: u32,
+    pub height: u32,
+    pub stride: u32,
+    pub bytes: u64,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(tag = "ev", rename_all = "lowercase")]
 pub enum Response {
@@ -221,10 +230,8 @@ pub enum Response {
     /// with it rather than having to be decoded out of a container.
     Thumb {
         req: u64,
-        width: u32,
-        height: u32,
-        stride: u32,
-        bytes: u64,
+        #[serde(flatten)]
+        info: ThumbnailInfo,
     },
     Stats {
         req: u64,
@@ -376,6 +383,15 @@ mod tests {
         let original = br#"{"ev":"stats","req":9,"entries":4,"pinned":2,"bytes":42,"budget":4096,"retention_days":null}"#;
         let frame: Response = serde_json::from_slice(original).unwrap();
         assert!(matches!(frame, Response::Stats { req: 9, .. }));
+        assert_eq!(serde_json::to_vec(&frame).unwrap(), original);
+    }
+
+    #[test]
+    fn shared_thumbnail_geometry_preserves_the_v1_flat_frame() {
+        let original =
+            br#"{"ev":"thumb","req":7,"width":256,"height":128,"stride":1024,"bytes":131072}"#;
+        let frame: Response = serde_json::from_slice(original).unwrap();
+        assert!(matches!(frame, Response::Thumb { req: 7, .. }));
         assert_eq!(serde_json::to_vec(&frame).unwrap(), original);
     }
 

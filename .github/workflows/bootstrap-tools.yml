@@ -69,6 +69,11 @@ jobs:
         run: cargo test --locked --release -p rldyour-clipboardd --test profile_lifecycle native_windows_observer_captures_the_first_copy_after_the_protocol_greeting -- --exact
       - name: Qualify the real native CLI and bounded subscription
         run: target/debug/clipboard-tools qualify-native-client
+      - name: Qualify the daemon without the optional image decoder
+        run: |
+          cargo clippy --locked -p rldyour-clipboardd --all-targets --no-default-features -- -D warnings
+          cargo test --locked -p rldyour-clipboardd --no-default-features
+          cargo build --locked --release -p rldyour-clipboardd --no-default-features
       - name: Prepare the real GJS runtime
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install --no-install-recommends -y gjs

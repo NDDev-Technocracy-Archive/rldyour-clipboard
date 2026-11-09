@@ -15,7 +15,7 @@ use crate::kind::Kind;
 use crate::outbox::{Outbox, Subscription, Watchers};
 use crate::proto::{self, Request, Response, Role, code};
 use crate::store::{Accepted, Store, StoreError};
-use nddev_clipboard_api::wire::ArchiveStats;
+use nddev_clipboard_api::wire::{ArchiveStats, ThumbnailInfo};
 use std::collections::HashMap;
 use std::io::{self, BufRead, Read};
 use std::sync::Arc;
@@ -265,10 +265,12 @@ impl Session {
                     self.out.send_blob(
                         &Response::Thumb {
                             req,
-                            width: pixels.width,
-                            height: pixels.height,
-                            stride: pixels.stride(),
-                            bytes,
+                            info: ThumbnailInfo {
+                                width: pixels.width,
+                                height: pixels.height,
+                                stride: pixels.stride(),
+                                bytes,
+                            },
                         },
                         &mut std::io::Cursor::new(&pixels.rgba),
                         bytes,

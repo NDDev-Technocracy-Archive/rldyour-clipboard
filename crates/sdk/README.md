@@ -44,6 +44,16 @@ matching acknowledgement. Dropping the writer without it closes the connection e
 body bytes were written. A matching remote refusal consumes its reply and permits reuse.
 File-selection encoding can therefore stream straight to the daemon without an intermediate TAR.
 
+`part_chunks_from` accepts a reader whose final size is unknown and emits bounded v1 chunks.
+Only a clean input EOF sends the successful terminator and consumes the matching acknowledgement.
+An input error, overflow, transport failure or deadline closes the connection and leaves the
+draft unpublished. Known-length and unknown-length delivery retain the same content identity.
+
+`thumbnail_to` streams straight RGBA pixels into a caller-owned writer using the shared
+`ThumbnailInfo` contract. It checks nonzero geometry, tight row packing and the exact byte count
+before copying. A truncated payload or failed destination closes the connection; no leftover
+pixel bytes can become a later response. The original stored image remains a separate fetch.
+
 Truncated data, I/O failures and unexpected frames invalidate the connection. Drop that client
 so the daemon releases any draft. A matching remote request error preserves the connection.
 Protocol errors contain no copied content or remote diagnostic message.

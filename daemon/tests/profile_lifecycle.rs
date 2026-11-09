@@ -769,6 +769,242 @@ fn the_rust_sdk_streams_real_multiformat_entries_and_recovers_from_a_refused_req
     );
 }
 
+#[test]
+fn unknown_length_sdk_input_keeps_exact_bytes_and_never_publishes_a_failed_prefix() {
+    use nddev_clipboard_api::wire::Role;
+    use nddev_clipboard_sdk::{Error, LocalOperation};
+
+    let fixture = Fixture::new();
+    let profile = fixture.profile("chunks.toml", "archive", "chunks.sock");
+    let endpoint = fixture.0.join("chunks.sock");
+    let (_daemon, _peer) = Daemon::start(&profile, &endpoint);
+    let connect = || {
+        LocalOperation::new(Instant::now() + Duration::from_secs(10))
+            .connect(&endpoint, Role::Both)
+            .unwrap()
+    };
+    let mut client = connect();
+    let original: Vec<u8> = (0..=255).cycle().take(1_200_000).collect();
+    let draft = client.begin(Some("unknown-length synthetic")).unwrap();
+    client
+        .part_chunks_from(draft, "application/octet-stream", &mut original.as_slice())
+        .unwrap();
+    let entry = client.commit(draft).unwrap();
+    let mut restored = Vec::new();
+    client.fetch_to(entry, None, false, &mut restored).unwrap();
+    assert_eq!(restored, original);
+    let draft = client.begin(None).unwrap();
+    client
+        .part_from(
+            draft,
+            "application/octet-stream",
+            original.len() as u64,
+            &mut original.as_slice(),
+        )
+        .unwrap();
+    assert_eq!(client.commit(draft).unwrap(), entry);
+    assert_eq!(client.stats().unwrap().entries, 1);
+
+    struct BrokenInput(bool);
+    impl Read for BrokenInput {
+        fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+            if self.0 {
+                return Err(std::io::ErrorKind::InvalidData.into());
+            }
+            output[..4].copy_from_slice(b"fail");
+            self.0 = true;
+            Ok(4)
+        }
+    }
+    let draft = client.begin(None).unwrap();
+    assert!(matches!(
+        client.part_chunks_from(draft, "text/plain", &mut BrokenInput(false)),
+        Err(Error::Transport(std::io::ErrorKind::InvalidData))
+    ));
+    assert!(matches!(client.commit(draft), Err(Error::Closed)));
+    drop(client);
+    let mut client = connect();
+    assert_eq!(client.stats().unwrap().entries, 1);
+    restored.clear();
+    client.fetch_to(entry, None, false, &mut restored).unwrap();
+    assert_eq!(restored, original);
+}
+
+#[cfg(feature = "thumbnails")]
+#[test]
+fn sdk_thumbnail_pixels_and_transcoded_images_keep_the_original_archive_bytes() {
+    use nddev_clipboard_api::wire::Role;
+    use nddev_clipboard_sdk::{Error, LocalOperation};
+
+    let fixture = Fixture::new();
+    let profile = fixture.profile("image.toml", "archive", "image.sock");
+    let endpoint = fixture.0.join("image.sock");
+    let (_daemon, _peer) = Daemon::start(&profile, &endpoint);
+    let mut client = LocalOperation::new(Instant::now() + Duration::from_secs(10))
+        .connect(&endpoint, Role::Both)
+        .unwrap();
+    let image = image::RgbaImage::from_pixel(600, 300, image::Rgba([0x12, 0x34, 0x56, 0xff]));
+    let mut encoded = std::io::Cursor::new(Vec::new());
+    image
+        .write_to(&mut encoded, image::ImageFormat::Png)
+        .unwrap();
+    let original = encoded.into_inner();
+    let draft = client.begin(Some("synthetic image")).unwrap();
+    client
+        .part_from(
+            draft,
+            "image/png",
+            original.len() as u64,
+            &mut original.as_slice(),
+        )
+        .unwrap();
+    let entry = client.commit(draft).unwrap();
+    let page = client.list(ListQuery::default()).unwrap();
+    assert_eq!(page.items[0].kind, "image");
+    assert_eq!(
+        (
+            page.items[0].width,
+            page.items[0].height,
+            page.items[0].thumb
+        ),
+        (Some(600), Some(300), true)
+    );
+    let mut pixels = Vec::new();
+    let geometry = client.thumbnail_to(entry, &mut pixels).unwrap();
+    assert_eq!(
+        (
+            geometry.width,
+            geometry.height,
+            geometry.stride,
+            geometry.bytes
+        ),
+        (256, 128, 1024, 131_072)
+    );
+    assert_eq!(pixels.len() as u64, geometry.bytes);
+    assert!(
+        pixels
+            .chunks_exact(4)
+            .all(|pixel| pixel == [0x12, 0x34, 0x56, 0xff])
+    );
+    let mut bmp = Vec::new();
+    let blob = client
+        .fetch_to(entry, Some("image/bmp"), true, &mut bmp)
+        .unwrap();
+    assert_eq!(blob.mime, "image/bmp");
+    let decoded = image::load_from_memory_with_format(&bmp, image::ImageFormat::Bmp)
+        .unwrap()
+        .to_rgba8();
+    assert_eq!((decoded.width(), decoded.height()), (600, 300));
+    assert!(
+        decoded
+            .pixels()
+            .all(|pixel| pixel.0 == [0x12, 0x34, 0x56, 0xff])
+    );
+    let mut literal = Vec::new();
+    client
+        .fetch_to(entry, Some("image/png"), false, &mut literal)
+        .unwrap();
+    assert_eq!(literal, original);
+
+    struct RefusedOutput;
+    impl Write for RefusedOutput {
+        fn write(&mut self, _input: &[u8]) -> std::io::Result<usize> {
+            Err(std::io::ErrorKind::WriteZero.into())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    assert!(matches!(
+        client.thumbnail_to(entry, &mut RefusedOutput),
+        Err(Error::Transport(std::io::ErrorKind::WriteZero))
+    ));
+    assert!(matches!(client.stats(), Err(Error::Closed)));
+}
+
+#[cfg(not(feature = "thumbnails"))]
+#[test]
+fn a_thumbnail_refusal_without_the_decoder_preserves_the_original_and_connection() {
+    use nddev_clipboard_api::wire::Role;
+    use nddev_clipboard_sdk::{Error, LocalOperation};
+    let fixture = Fixture::new();
+    let profile = fixture.profile("image.toml", "archive", "image.sock");
+    let endpoint = fixture.0.join("image.sock");
+    let (_daemon, _peer) = Daemon::start(&profile, &endpoint);
+    let mut client = LocalOperation::new(Instant::now() + Duration::from_secs(10))
+        .connect(&endpoint, Role::Both)
+        .unwrap();
+    let draft = client.begin(None).unwrap();
+    let mut input = PNG;
+    client
+        .part_from(draft, "image/png", PNG.len() as u64, &mut input)
+        .unwrap();
+    let entry = client.commit(draft).unwrap();
+    assert!(
+        matches!(client.thumbnail_to(entry, &mut Vec::new()), Err(Error::Remote { code }) if code == "no-such-mime")
+    );
+    let mut original = Vec::new();
+    client.fetch_to(entry, None, false, &mut original).unwrap();
+    assert_eq!(original, PNG);
+}
+
+#[test]
+fn startup_expiry_preserves_favorites_and_their_original_bytes() {
+    use nddev_clipboard_api::wire::Role;
+    use nddev_clipboard_sdk::LocalOperation;
+
+    let fixture = Fixture::new();
+    let profile = fixture.profile("retention.toml", "archive", "retention.sock");
+    let endpoint = fixture.0.join("retention.sock");
+    let connect = || {
+        LocalOperation::new(Instant::now() + Duration::from_secs(10))
+            .connect(&endpoint, Role::Both)
+            .unwrap()
+    };
+    let (daemon, peer) = Daemon::start(&profile, &endpoint);
+    let mut client = connect();
+    let mut entries = Vec::new();
+    for payload in [
+        b"expire synthetic".as_slice(),
+        b"favorite synthetic",
+        b"fresh synthetic",
+    ] {
+        let draft = client.begin(None).unwrap();
+        client
+            .part_from(draft, "text/plain", payload.len() as u64, &mut &payload[..])
+            .unwrap();
+        entries.push(client.commit(draft).unwrap());
+    }
+    client.pin(entries[1], true).unwrap();
+    drop(client);
+    drop(peer);
+    drop(daemon);
+    let config = Config::read(&profile).unwrap();
+    let retention = config.retention_seconds().unwrap();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    let db = rusqlite::Connection::open(fixture.0.join("archive/index.db")).unwrap();
+    db.execute(
+        "UPDATE entry SET at=?1 WHERE id IN (?2,?3)",
+        rusqlite::params![now - retention - 86_400, entries[0], entries[1]],
+    )
+    .unwrap();
+    drop(db);
+    let (_daemon, _peer) = Daemon::start(&profile, &endpoint);
+    let mut client = connect();
+    let page = client.list(ListQuery::default()).unwrap();
+    let ids: Vec<_> = page.items.iter().map(|entry| entry.id).collect();
+    assert_eq!(ids, [entries[1], entries[2]]);
+    let mut restored = Vec::new();
+    client
+        .fetch_to(entries[1], None, false, &mut restored)
+        .unwrap();
+    assert_eq!(restored, b"favorite synthetic");
+    assert_eq!(client.stats().unwrap().pinned, 1);
+}
+
 #[cfg(target_os = "linux")]
 #[test]
 fn systemd_activation_serves_the_triggering_connection_without_a_second_listener() {
