@@ -18,6 +18,7 @@ use utoipa::OpenApi;
 )))]
 struct LocalContract;
 
+mod extension;
 mod fingerprint;
 mod native_client;
 mod platform_client;
@@ -38,7 +39,7 @@ fn main() -> std::process::ExitCode {
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let command = std::env::args()
         .nth(1)
-        .ok_or("expected check or generate")?;
+        .ok_or("expected a clipboard-tools command")?;
     let root = std::env::current_dir()?.canonicalize()?;
     let manifest: toml::Value = toml::from_str(&std::fs::read_to_string(root.join("Cargo.toml"))?)?;
     let package = &manifest["workspace"]["package"];
@@ -51,6 +52,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     match command.as_str() {
         "check" => generated(&root, false),
         "generate" => generated(&root, true),
+        "check-extension" => Ok(extension::check(&root)?),
         "prepare-upgrade-fixture" => upgrade_fixture::prepare(&root),
         "qualify-platform-client" => platform_client::qualify(&root),
         "qualify-native-client" => native_client::qualify(&root),
@@ -61,7 +63,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             std::fs::copy(std::env::current_exe()?, target)?;
             Ok(())
         }
-        _ => Err("expected check or generate".into()),
+        _ => Err("unknown clipboard-tools command".into()),
     }
 }
 

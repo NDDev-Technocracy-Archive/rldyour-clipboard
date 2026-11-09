@@ -33,6 +33,10 @@ wire format, immutable published releases and existing archive/installation iden
 Build-free checks run with `just check`. Builds, tests and applications run on execution hosts
 or CI. `just build-tools` prepares the verifier there; `just generate` refreshes committed
 contracts and UI projections. `just test` and `just test-browser` belong on execution hosts.
+`clipboard-tools check-extension` owns the retained GNOME source rules. It uses bounded,
+direct `node --check` and `glib-compile-schemas --strict --dry-run` calls without loading
+extension code. Keep metadata, process isolation, GType, settings and versioned API checks
+when changing that client. Node comes from the accepted toolchain; GLib validates its schema.
 `just test` prepares a pinned, unmodified release fixture through GitHub CLI, verifies
 repository/release IDs, size and SHA, and qualifies archive upgrade plus return to that baseline
 with native capture disabled. The fixture lives only in `.build/`; installers never run.

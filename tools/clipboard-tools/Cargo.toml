@@ -16,6 +16,8 @@ toml.workspace = true
 sha2.workspace = true
 utoipa.workspace = true
 tempfile.workspace = true
+regex.workspace = true
+thiserror.workspace = true
 
 [build-dependencies]
 sha2.workspace = true

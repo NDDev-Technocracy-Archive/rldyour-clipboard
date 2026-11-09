@@ -28,6 +28,7 @@ objc2-app-kit = { version = "=0.3.2", default-features = false }
 objc2-foundation = { version = "=0.3.2", default-features = false }
 rusqlite = "=0.41.1"
 tempfile = "=3.27.0"
+regex = { version = "=1.13.1", default-features = false, features = ["std", "perf"] }
 private-fs = { version = "=0.2.1", default-features = false }
 uds_windows = "=1.2.1"
 windows-sys = "=0.61.2"

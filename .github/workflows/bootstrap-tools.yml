@@ -31,7 +31,7 @@ jobs:
           components: rustfmt,clippy
           cache: false
       - name: Check the independent configuration contract
-        run: cargo test --locked -p nddev-clipboard-api -p nddev-clipboard-sdk -p nddev-clipboard -p nddev-clipboard-platform -p nddev-clipboard-files
+        run: cargo test --locked -p nddev-clipboard-api -p nddev-clipboard-sdk -p nddev-clipboard -p nddev-clipboard-platform -p nddev-clipboard-files -p clipboard-tools
       - name: Compile the source verifier and produce its schema
         shell: bash
         run: |
@@ -77,6 +77,13 @@ jobs:
       - name: Prepare the real GJS runtime
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install --no-install-recommends -y gjs
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        if: runner.os == 'Linux'
+        with:
+          node-version: '26.13.0'
+      - name: Check retained extension sources without loading GNOME Shell
+        if: runner.os == 'Linux'
+        run: target/debug/clipboard-tools check-extension
       - name: Qualify the retained platform client against the configured product
         if: runner.os != 'Windows'
         run: target/debug/clipboard-tools qualify-platform-client

@@ -29,7 +29,11 @@ jobs:
           done
           sudo apt-get update -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
           sudo apt-get install --no-install-recommends -y libglib2.0-bin
-      - run: ./scripts/check-extension.sh
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '26.13.0'
+      - run: cargo build --locked -p clipboard-tools
+      - run: target/debug/clipboard-tools check-extension
       - run: cargo test --all-features --locked --manifest-path daemon/Cargo.toml
       - run: cargo build --release --all-features --locked --manifest-path daemon/Cargo.toml
       - name: Package Linux
