@@ -13,6 +13,14 @@ incompatible change. New fields may appear inside version 1.
 
 ## Transport
 
+The development source selects its endpoint and archive through a complete
+[TOML profile](configuration.md). Every client uses the product's configuration
+reader; endpoint discovery does not open the archive or start a collector.
+Missing fields do not fall back to the legacy environment variables.
+
+The following locations describe the retained published release. They are
+installation identities to preserve during an explicit profile migration:
+
 | Platform | Socket |
 |---|---|
 | Any | `$RLDYOUR_CLIPBOARD_HOME/rldyour-clipboard.sock` when the override is set |
@@ -20,13 +28,17 @@ incompatible change. New fields may appear inside version 1.
 | macOS | `~/Library/Application Support/rldyour-clipboard/rldyour-clipboard.sock` |
 | Windows | `%LOCALAPPDATA%\rldyour-clipboard\rldyour-clipboard.sock` |
 
-The override relocates archive and socket together — the socket belongs beside
-the archive it serves — and every client resolves it the same way.
+In that published configuration, the override relocates archive and socket together.
+The development profile instead supplies both paths explicitly; it does not move
+an existing archive or infer its policy from the environment.
 
-The socket is mode `0600`: only the owning user may connect. The archive holds
-everything the user has copied, so the socket is the whole security boundary
-and it is never widened. On Linux systemd binds it (`SocketMode=0600`); the
-daemon applies the same mode when it binds one itself.
+On POSIX the pathname socket is mode `0600`. Linux systemd binds it with
+`SocketMode=0600`; the daemon applies that mode when it owns the listener.
+The profile and archive require private placement, and unrelated occupied paths
+must survive startup refusal. Windows uses AF_UNIX and separate filesystem
+security rules; the development endpoint classifier does not establish a
+completed Windows archive/socket ACL migration. That qualification remains a
+release requirement.
 
 ## Framing
 
@@ -41,12 +53,15 @@ after the last payload byte.
 {"op":"commit","req":5,"draft":7}\n
 ```
 
-A payload is opaque. It is never base64-encoded, never escaped, and is streamed between the transport and daemon blob files. GNOME capture
-forwards chunks, Python `fetch_to` streams output, and native UI restores use
-private temporary files for large payloads.
+A payload is opaque. It is never base64-encoded or escaped and is streamed
+between the transport and daemon blob files. The Rust SDK's borrowed readers,
+bounded writers and chunked input retain that separation. GNOME capture
+forwards chunks; retained native UI restores use private temporary files for
+large payloads. A client's source/destination still owns its blocking I/O policy.
 
 Responses to a connection's requests are emitted in the order the requests
-arrived, so a client may correlate by `req` or by position. Payloads are
+arrived. Match each solicited response to its `req`; notifications have separate
+ownership and must not be mistaken for a reply. Payloads are
 written atomically with their frame, so a payload never interleaves with
 another frame.
 
@@ -305,8 +320,9 @@ reconnect on a short backoff rather than treat it as an error.
 
 ## Storage
 
-The archive lives in one directory, which is the only thing that needs backing
-up or deleting:
+The archive lives in the selected profile's `archive_dir`. The retained
+published release uses these locations; migration preserves the selected
+archive rather than creating a second history:
 
 | Platform | Directory |
 |---|---|
@@ -324,14 +340,33 @@ oldest first, skipping pinned ones, until it is under budget again. A single
 representation larger than the budget is refused with `too-large` rather than
 evicting the entire archive to hold it.
 
-The index runs in WAL mode with `synchronous=NORMAL`. A committed entry
-survives the daemon exiting or crashing; what it does not promise is survival
-of the last commits across a power cut, since they are not fsynced on every
-transaction. Corruption is not a possible outcome of that trade — the WAL is
-still written and replayed correctly — and blobs an interrupted commit left
-unreferenced are swept at startup, so nothing leaks. Clipboard history is a
-workload where losing the newest second of copies to a power failure is cheap;
-paying an fsync per copy would be the wrong side of the bargain.
+Ordinary copies use WAL with `synchronous=NORMAL`. Recent copies may roll back
+after power loss; process exit is a different boundary. SQLite's recovery
+guarantees depend on the filesystem and storage honoring its documented
+contracts. Pinning flushes the referenced content before its FULL-synchronous
+SQLite commit; POSIX also synchronizes the relevant directories. Windows does
+not provide the same portable directory synchronization guarantee. See
+[SQLite's synchronous policy](https://www.sqlite.org/pragma.html#pragma_synchronous)
+and [WAL recovery](https://www.sqlite.org/wal.html). Unreferenced blobs are
+reconciled by the archive's startup and maintenance work; this is not a
+hardware power-loss or corruption-impossibility promise.
+
+### Durable file selections in development
+
+`application/vnd.nddev.clipboard.files.v1+tar` carries one complete selection
+under the accepted file-history contract. It uses an uncompressed streaming
+TAR with relative component names, declared lengths, a manifest and final
+SHA-256 digests. It contains file bytes, distinct from native file-URL/reference
+representations. An older reference-only entry has no saved file bytes and is
+never backfilled by reading its former paths.
+
+Use the [file-selection codec](../crates/files/README.md) through the SDK's
+exclusive upload writer or representation-bounded reader. A receiver keeps
+extracted data private until all members, lengths, digests and the exact trailer
+have validated. Decoding alone grants no native clipboard access and chooses
+no export ownership or lifetime. Storage interoperability through the unchanged
+published executable is qualified; native file capture, private export and
+application paste remain part of the unfinished product migration.
 
 
 ## Retention and resource limits (0.2)
