@@ -81,7 +81,6 @@ pub(super) fn bundle(root: &Path) -> Result<(), Error> {
         .args([
             "metadata",
             "--locked",
-            "--offline",
             "--format-version",
             "1",
             "--filter-platform",
