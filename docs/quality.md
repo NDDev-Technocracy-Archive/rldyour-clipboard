@@ -75,3 +75,8 @@ after all inputs succeed. The source-tool producer independently verifies its
 manifest with `sha256sum --check`. This source migration does not qualify the
 remaining legacy packaging, installers or final release workflow; those remain
 part of #14.
+
+The checksum tool builds and runs in the release-preparation job with read-only
+repository access. The publishing job downloads that run's prepared assets;
+it checks out no source and compiles or executes no project code with write
+access.
