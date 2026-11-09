@@ -1,0 +1,18 @@
+[package]
+name = "nddev-clipboard"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Native CLI for the NDDev Clipboard local contract"
+
+[dependencies]
+nddev-clipboard-api.workspace = true
+nddev-clipboard-sdk.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

@@ -170,6 +170,16 @@ pub struct Summary {
     pub at: i64,
 }
 
+/// Current archive policy and counters, shared by the wire and native clients.
+#[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
+pub struct ArchiveStats {
+    pub entries: i64,
+    pub pinned: i64,
+    pub bytes: i64,
+    pub budget: i64,
+    pub retention_days: Option<u64>,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(tag = "ev", rename_all = "lowercase")]
 pub enum Response {
@@ -218,12 +228,8 @@ pub enum Response {
     },
     Stats {
         req: u64,
-        entries: i64,
-        /// How many of them are pinned — the favourites.
-        pinned: i64,
-        bytes: i64,
-        budget: i64,
-        retention_days: Option<u64>,
+        #[serde(flatten)]
+        stats: ArchiveStats,
     },
     Added {
         entry: Summary,
@@ -363,6 +369,14 @@ mod tests {
         let mut out = Vec::new();
         Response::Ok { req: 3 }.encode(&mut out);
         assert_eq!(out, br#"{"ev":"ok","req":3}"#.to_vec().tap_newline());
+    }
+
+    #[test]
+    fn shared_statistics_preserve_the_v1_flat_frame() {
+        let original = br#"{"ev":"stats","req":9,"entries":4,"pinned":2,"bytes":42,"budget":4096,"retention_days":null}"#;
+        let frame: Response = serde_json::from_slice(original).unwrap();
+        assert!(matches!(frame, Response::Stats { req: 9, .. }));
+        assert_eq!(serde_json::to_vec(&frame).unwrap(), original);
     }
 
     #[test]

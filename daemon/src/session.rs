@@ -15,6 +15,7 @@ use crate::kind::Kind;
 use crate::outbox::{Outbox, Watchers};
 use crate::proto::{self, Request, Response, Role, code};
 use crate::store::{Accepted, Store, StoreError};
+use nddev_clipboard_api::wire::ArchiveStats;
 use std::collections::HashMap;
 use std::io::{self, BufRead, Read};
 use std::sync::Arc;
@@ -318,11 +319,13 @@ impl Session {
             Request::Stats { .. } => match self.store.stats() {
                 Ok((entries, pinned, bytes)) => self.out.send(&Response::Stats {
                     req,
-                    entries,
-                    pinned,
-                    bytes,
-                    budget: self.store.budget(),
-                    retention_days: self.store.retention_days(),
+                    stats: ArchiveStats {
+                        entries,
+                        pinned,
+                        bytes,
+                        budget: self.store.budget(),
+                        retention_days: self.store.retention_days(),
+                    },
                 }),
                 Err(error) => self.failed(req, &error),
             },
@@ -742,6 +745,39 @@ mod tests {
     fn control_frames_must_be_text() {
         let mut input = io::Cursor::new(vec![0xff, 0xfe, b'\n']);
         assert!(read_frame(&mut input).is_err());
+    }
+
+    #[test]
+    fn a_successful_watch_greeting_already_owns_its_subscription() {
+        let dir = TempDir::new();
+        let store = Arc::new(Store::open(dir.path(), 4096).unwrap());
+        let watchers = Arc::new(Watchers::default());
+        let (ours, theirs) = Stream::pair().unwrap();
+        theirs
+            .set_read_timeout(Some(std::time::Duration::from_secs(3)))
+            .unwrap();
+        let out = Arc::new(Outbox::new(ours));
+        let mut session = Session::new(store, out, watchers.clone());
+        let mut input = io::Cursor::new(
+            br#"{"op":"hello","v":1,"role":"ui","watch":true}
+"#,
+        );
+        assert!(session.greet(&mut input).unwrap());
+        assert_eq!(
+            watchers.count(),
+            1,
+            "a successful greeting must establish notification readiness"
+        );
+        watchers.broadcast(&Response::Removed { entry: 7 });
+        let mut reader = io::BufReader::new(theirs);
+        for expected in ["hello", "removed"] {
+            let mut line = String::new();
+            reader.read_line(&mut line).unwrap();
+            let frame: serde_json::Value = serde_json::from_str(&line).unwrap();
+            assert_eq!(frame["ev"], expected);
+        }
+        drop(session);
+        assert_eq!(watchers.count(), 0);
     }
 
     /// A live session on one end of a socket pair, driven from the other.

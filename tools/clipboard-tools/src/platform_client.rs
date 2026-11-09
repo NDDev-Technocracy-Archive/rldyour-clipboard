@@ -1,44 +1,13 @@
+use crate::qualification::{OwnedProcess, build_bins, private_directory};
 use nddev_clipboard_api::wire::Role;
 use nddev_clipboard_api::{Config, FileConfig};
 use nddev_clipboard_sdk::{Client, Error, LocalOperation, LocalTransport};
-use serde::Deserialize;
-use std::io::{self, BufRead};
-use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::io;
+use std::path::Path;
+use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
-
-struct OwnedProcess(Child);
-
-impl OwnedProcess {
-    fn start(command: &mut Command) -> io::Result<Self> {
-        Ok(Self(command.stdin(Stdio::null()).spawn()?))
-    }
-
-    fn finish(&mut self, deadline: Instant) -> Result<()> {
-        loop {
-            if let Some(status) = self.0.try_wait()? {
-                return if status.success() {
-                    Ok(())
-                } else {
-                    Err("platform client command failed".into())
-                };
-            }
-            if Instant::now() >= deadline {
-                return Err("platform client command exceeded its deadline".into());
-            }
-            std::thread::sleep(Duration::from_millis(10));
-        }
-    }
-}
-
-impl Drop for OwnedProcess {
-    fn drop(&mut self) {
-        let _ = self.0.kill();
-        let _ = self.0.wait();
-    }
-}
 
 pub(crate) fn qualify(root: &Path) -> Result<()> {
     if !cfg!(any(target_os = "linux", target_os = "macos")) {
@@ -47,21 +16,11 @@ pub(crate) fn qualify(root: &Path) -> Result<()> {
     if std::env::args_os().nth(2).is_some() {
         return Err("unexpected platform-client argument".into());
     }
-    #[cfg(unix)]
-    let parent = Path::new("/tmp").canonicalize()?;
-    #[cfg(windows)]
-    let parent = std::env::temp_dir();
-    let mut builder = tempfile::Builder::new();
-    builder.prefix("cb-client-");
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        builder.permissions(std::fs::Permissions::from_mode(0o700));
-    }
-    let directory = builder.tempdir_in(parent)?;
-    // Build from this checked source and consume Cargo's actual artifact path.
-    // An installed or caller-supplied old daemon might ignore the new profile.
-    let daemon = build_daemon(root, directory.path())?;
+    let directory = private_directory("cb-client-")?;
+    let binaries = build_bins(root, directory.path(), &["rldyour-clipboardd"])?;
+    let [daemon] = binaries.as_slice() else {
+        return Err("expected the current daemon artifact".into());
+    };
     let endpoint = directory.path().join("clipboard.sock");
     let retention_days = 9;
     let config = Config::new(FileConfig {
@@ -154,58 +113,4 @@ fn record(client: &mut Client<LocalTransport>, payload: &[u8]) -> Result<()> {
     client.part_from(draft, "text/plain", payload.len() as u64, &mut input)?;
     client.commit(draft)?;
     Ok(())
-}
-
-#[derive(Deserialize)]
-struct BuildMessage {
-    reason: String,
-    executable: Option<PathBuf>,
-    target: Option<BuildTarget>,
-}
-
-#[derive(Deserialize)]
-struct BuildTarget {
-    name: String,
-    kind: Vec<String>,
-}
-
-fn build_daemon(root: &Path, directory: &Path) -> Result<PathBuf> {
-    let path = directory.join("build-messages.jsonl");
-    let output = std::fs::File::create_new(&path)?;
-    let mut command = Command::new("cargo");
-    command
-        .current_dir(root)
-        .args([
-            "build",
-            "--locked",
-            "--package",
-            "rldyour-clipboardd",
-            "--bin",
-            "rldyour-clipboardd",
-            "--message-format=json",
-        ])
-        .stdout(output);
-    OwnedProcess::start(&mut command)?.finish(Instant::now() + Duration::from_secs(120))?;
-    if std::fs::metadata(&path)?.len() > 16 * 1024 * 1024 {
-        return Err("compiler artifact receipt exceeded its bound".into());
-    }
-    let mut artifacts = Vec::new();
-    for line in io::BufReader::new(std::fs::File::open(path)?).lines() {
-        let message: BuildMessage = serde_json::from_str(&line?)?;
-        if message.reason == "compiler-artifact"
-            && message.target.as_ref().is_some_and(|target| {
-                target.name == "rldyour-clipboardd" && target.kind.iter().any(|kind| kind == "bin")
-            })
-            && let Some(path) = message.executable
-        {
-            artifacts.push(path);
-        }
-    }
-    let [executable] = artifacts.as_slice() else {
-        return Err("expected one current daemon compiler artifact".into());
-    };
-    if !executable.is_absolute() || !std::fs::symlink_metadata(executable)?.is_file() {
-        return Err("daemon compiler artifact is not an absolute regular file".into());
-    }
-    Ok(executable.clone())
 }

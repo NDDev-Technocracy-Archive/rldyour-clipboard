@@ -1,5 +1,6 @@
 //! Actual product processes and private synthetic archives, with capture disabled.
 use nddev_clipboard_api::{Config, FileConfig};
+use nddev_clipboard_sdk::ListQuery;
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
@@ -332,7 +333,14 @@ fn record_synthetic_files(root: &Path, endpoint: &Path) -> SyntheticFiles {
     let mut client = LocalOperation::new(Instant::now() + Duration::from_secs(15))
         .connect(endpoint, Role::Both)
         .unwrap();
-    let before = client.list(10, None, None, None).unwrap().items.len();
+    let before = client
+        .list(ListQuery {
+            limit: Some(10),
+            ..ListQuery::default()
+        })
+        .unwrap()
+        .items
+        .len();
     let mut entry = None;
     for _ in 0..2 {
         let draft = client.begin(Some("synthetic durable files")).unwrap();
@@ -368,7 +376,12 @@ fn record_synthetic_files(root: &Path, endpoint: &Path) -> SyntheticFiles {
     let mut client = LocalOperation::new(Instant::now() + Duration::from_secs(5))
         .connect(endpoint, Role::Ui)
         .unwrap();
-    let page = client.list(10, None, None, None).unwrap();
+    let page = client
+        .list(ListQuery {
+            limit: Some(10),
+            ..ListQuery::default()
+        })
+        .unwrap();
     assert_eq!(page.items.len(), before + 1);
     let summary = page
         .items
@@ -437,7 +450,13 @@ fn restore_synthetic_files(
     reader.finish().unwrap();
     drop(private);
     let restored = PrivateDir::open(&destination).unwrap();
-    let page = client.list(10, None, None, Some(true)).unwrap();
+    let page = client
+        .list(ListQuery {
+            limit: Some(10),
+            pinned: Some(true),
+            ..ListQuery::default()
+        })
+        .unwrap();
     assert!(
         page.items
             .iter()
@@ -580,7 +599,16 @@ fn the_rust_sdk_streams_real_multiformat_entries_and_recovers_from_a_refused_req
     let operation = LocalOperation::new(Instant::now() + Duration::from_secs(15));
     let cancellation = operation.cancellation();
     let mut client = operation.connect(&endpoint, Role::Both).unwrap();
-    assert!(client.list(10, None, None, None).unwrap().items.is_empty());
+    assert!(
+        client
+            .list(ListQuery {
+                limit: Some(10),
+                ..ListQuery::default()
+            })
+            .unwrap()
+            .items
+            .is_empty()
+    );
 
     let payload: Vec<u8> = (0..=255).cycle().take(3 * 1024 * 1024).collect();
     let html = b"<p>Isolated SDK fixture</p>";
@@ -598,7 +626,13 @@ fn the_rust_sdk_streams_real_multiformat_entries_and_recovers_from_a_refused_req
         .unwrap();
     let entry = client.commit(draft).unwrap();
     client.pin(entry, true).unwrap();
-    let page = client.list(10, None, None, Some(true)).unwrap();
+    let page = client
+        .list(ListQuery {
+            limit: Some(10),
+            pinned: Some(true),
+            ..ListQuery::default()
+        })
+        .unwrap();
     assert_eq!(page.items.len(), 1);
     assert_eq!(page.items[0].id, entry);
     assert_eq!(page.items[0].mimes.len(), 2);
@@ -640,13 +674,31 @@ fn the_rust_sdk_streams_real_multiformat_entries_and_recovers_from_a_refused_req
         matches!(client.pin(i64::MAX, true), Err(Error::Remote { code }) if code == "no-such-entry")
     );
     assert_eq!(
-        client.list(10, None, None, Some(true)).unwrap().items[0].id,
+        client
+            .list(ListQuery {
+                limit: Some(10),
+                pinned: Some(true),
+                ..ListQuery::default()
+            })
+            .unwrap()
+            .items[0]
+            .id,
         entry
     );
 
     let discarded = client.begin(None).unwrap();
     client.abort(discarded).unwrap();
-    assert_eq!(client.list(10, None, None, None).unwrap().items.len(), 1);
+    assert_eq!(
+        client
+            .list(ListQuery {
+                limit: Some(10),
+                ..ListQuery::default()
+            })
+            .unwrap()
+            .items
+            .len(),
+        1
+    );
 
     let abandoned = client.begin(None).unwrap();
     cancellation.cancel();
@@ -655,7 +707,10 @@ fn the_rust_sdk_streams_real_multiformat_entries_and_recovers_from_a_refused_req
         Err(Error::Transport(std::io::ErrorKind::ConnectionAborted))
     ));
     assert!(matches!(
-        client.list(10, None, None, None),
+        client.list(ListQuery {
+            limit: Some(10),
+            ..ListQuery::default()
+        }),
         Err(Error::Closed)
     ));
     drop(client);
@@ -665,7 +720,14 @@ fn the_rust_sdk_streams_real_multiformat_entries_and_recovers_from_a_refused_req
     // An older cancellation owner cannot shut down a replacement connection.
     cancellation.cancel();
     assert_eq!(
-        replacement.list(10, None, None, None).unwrap().items.len(),
+        replacement
+            .list(ListQuery {
+                limit: Some(10),
+                ..ListQuery::default()
+            })
+            .unwrap()
+            .items
+            .len(),
         1
     );
     {
@@ -694,7 +756,15 @@ fn the_rust_sdk_streams_real_multiformat_entries_and_recovers_from_a_refused_req
         .connect(&endpoint, Role::Ui)
         .unwrap();
     assert_eq!(
-        reconnected.list(10, None, None, Some(true)).unwrap().items[0].id,
+        reconnected
+            .list(ListQuery {
+                limit: Some(10),
+                pinned: Some(true),
+                ..ListQuery::default()
+            })
+            .unwrap()
+            .items[0]
+            .id,
         entry
     );
 }

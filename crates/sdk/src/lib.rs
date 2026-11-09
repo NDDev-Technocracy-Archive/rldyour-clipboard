@@ -6,7 +6,9 @@
 //! Control frames are bounded; representation bytes use fixed-size buffers.
 //! Interrupted or malformed exchanges invalidate the connection so leftover
 //! payload bytes can never be interpreted as another response.
-use nddev_clipboard_api::wire::{MAX_FRAME, PROTOCOL_VERSION, Request, Response, Role, Summary};
+use nddev_clipboard_api::wire::{
+    ArchiveStats, MAX_FRAME, PROTOCOL_VERSION, Request, Response, Role, Summary,
+};
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::sync::Arc;
 
@@ -14,9 +16,11 @@ use std::sync::Arc;
 mod local;
 mod payload;
 mod policy;
+mod subscription;
 #[cfg(any(unix, windows))]
 pub use local::{Cancellation, LocalOperation, LocalTransport};
 pub use payload::{BlobReader, PartWriter};
+pub use subscription::Subscription;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -39,6 +43,17 @@ pub enum Error {
 pub struct EntryPage {
     pub items: Vec<Summary>,
     pub more: bool,
+}
+
+/// Omitted fields use the provider's browsing policy. Text stays borrowed until
+/// the bounded request is encoded; the SDK never opens the archive to filter it.
+#[derive(Default)]
+pub struct ListQuery<'a> {
+    pub limit: Option<u32>,
+    pub before: Option<i64>,
+    pub query: Option<&'a str>,
+    pub kind: Option<&'a str>,
+    pub pinned: Option<bool>,
 }
 
 #[derive(Clone, Debug)]
@@ -66,6 +81,15 @@ impl<T: Read + Write> Client<T> {
         role: Role,
         policy: Option<Arc<policy::Policy>>,
     ) -> Result<Self, Error> {
+        Self::negotiate(transport, role, false, policy).map(|(client, _)| client)
+    }
+
+    fn negotiate(
+        transport: T,
+        role: Role,
+        watch: bool,
+        policy: Option<Arc<policy::Policy>>,
+    ) -> Result<(Self, Response), Error> {
         let mut client = Self {
             stream: BufReader::with_capacity(8192, transport),
             next_request: 1,
@@ -75,32 +99,27 @@ impl<T: Read + Write> Client<T> {
         client.send(&Request::Hello {
             v: PROTOCOL_VERSION,
             role,
-            watch: false,
+            watch,
         })?;
         match client.frame()? {
-            Response::Hello { v, .. } if v == PROTOCOL_VERSION => Ok(client),
+            greeting @ Response::Hello { v, .. } if v == PROTOCOL_VERSION => Ok((client, greeting)),
             Response::Hello { .. } => Err(Error::Version),
             Response::Error { code, .. } => Err(Error::Remote { code }),
             _ => Err(Error::UnexpectedResponse),
         }
     }
 
-    pub fn list(
-        &mut self,
-        limit: u32,
-        before: Option<i64>,
-        query: Option<&str>,
-        pinned: Option<bool>,
-    ) -> Result<EntryPage, Error> {
-        control_text(query)?;
+    pub fn list(&mut self, query: ListQuery<'_>) -> Result<EntryPage, Error> {
+        control_text(query.query)?;
+        control_text(query.kind)?;
         let req = self.request_id()?;
         self.send(&Request::List {
             req,
-            limit: Some(limit),
-            before,
-            query: query.map(str::to_owned),
-            kind: None,
-            pinned,
+            limit: query.limit,
+            before: query.before,
+            query: query.query.map(str::to_owned),
+            kind: query.kind.map(str::to_owned),
+            pinned: query.pinned,
         })?;
         match self.answer(req)? {
             Response::List { items, more, .. } => Ok(EntryPage { items, more }),
@@ -112,6 +131,28 @@ impl<T: Read + Write> Client<T> {
         let req = self.request_id()?;
         self.send(&Request::Pin { req, entry, pinned })?;
         self.expect_ok(req)
+    }
+
+    pub fn remove(&mut self, entry: i64) -> Result<(), Error> {
+        let req = self.request_id()?;
+        self.send(&Request::Remove { req, entry })?;
+        self.expect_ok(req)
+    }
+
+    /// Remove unpinned history. Favorites retain the provider's durable policy.
+    pub fn clear(&mut self) -> Result<(), Error> {
+        let req = self.request_id()?;
+        self.send(&Request::Clear { req })?;
+        self.expect_ok(req)
+    }
+
+    pub fn stats(&mut self) -> Result<ArchiveStats, Error> {
+        let req = self.request_id()?;
+        self.send(&Request::Stats { req })?;
+        match self.answer(req)? {
+            Response::Stats { stats, .. } => Ok(stats),
+            _ => self.invalidate(Error::UnexpectedResponse),
+        }
     }
 
     pub fn begin(&mut self, source: Option<&str>) -> Result<u64, Error> {

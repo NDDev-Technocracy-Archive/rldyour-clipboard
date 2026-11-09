@@ -27,6 +27,7 @@ test:
     cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
     cargo nextest run --locked --workspace --all-features
     cargo test --locked --workspace --doc
+    .tools/bin/clipboard-tools qualify-native-client
 
 test-browser:
     cd ui && bun run build:preview
@@ -35,3 +36,7 @@ test-browser:
 # Linux/macOS execution host only: builds this source and uses a private fixture.
 test-platform-client:
     .tools/bin/clipboard-tools qualify-platform-client
+
+# All supported native execution hosts: real CLI and daemon, synthetic profile.
+test-native-client:
+    .tools/bin/clipboard-tools qualify-native-client

@@ -1,6 +1,6 @@
 //! Adversarial peers exercise framing and connection reuse, never an OS clipboard.
 use nddev_clipboard_api::wire::{MAX_FRAME, Role};
-use nddev_clipboard_sdk::{Client, Error};
+use nddev_clipboard_sdk::{Client, Error, ListQuery};
 use std::io::{self, Cursor, Read, Write};
 
 struct Peer {
@@ -164,7 +164,10 @@ fn incomplete_incoming_and_outgoing_payloads_prevent_reuse() {
 fn a_large_query_is_rejected_before_any_request_bytes_are_written() {
     let mut client = client(b"{\"ev\":\"ok\",\"req\":1}\n");
     assert!(matches!(
-        client.list(10, None, Some(&"x".repeat(MAX_FRAME)), None),
+        client.list(ListQuery {
+            query: Some(&"x".repeat(MAX_FRAME)),
+            ..ListQuery::default()
+        }),
         Err(Error::InvalidFrame)
     ));
     client.pin(1, true).unwrap();

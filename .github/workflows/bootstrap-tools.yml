@@ -31,11 +31,11 @@ jobs:
           components: rustfmt,clippy
           cache: false
       - name: Check the independent configuration contract
-        run: cargo test --locked -p nddev-clipboard-api -p nddev-clipboard-sdk -p nddev-clipboard-platform -p nddev-clipboard-files
+        run: cargo test --locked -p nddev-clipboard-api -p nddev-clipboard-sdk -p nddev-clipboard -p nddev-clipboard-platform -p nddev-clipboard-files
       - name: Compile the source verifier and produce its schema
         shell: bash
         run: |
-          cargo clippy --locked -p nddev-clipboard-api -p nddev-clipboard-sdk -p nddev-clipboard-platform -p nddev-clipboard-files -p clipboard-tools --all-targets -- -D warnings
+          cargo clippy --locked -p nddev-clipboard-api -p nddev-clipboard-sdk -p nddev-clipboard -p nddev-clipboard-platform -p nddev-clipboard-files -p clipboard-tools --all-targets -- -D warnings
           cargo build --locked -p clipboard-tools
           target/debug/clipboard-tools generate
       - name: Prepare the source verifier artifact
@@ -67,6 +67,8 @@ jobs:
       - name: Qualify first native copy in a release Windows process
         if: runner.os == 'Windows'
         run: cargo test --locked --release -p rldyour-clipboardd --test profile_lifecycle native_windows_observer_captures_the_first_copy_after_the_protocol_greeting -- --exact
+      - name: Qualify the real native CLI and bounded subscription
+        run: target/debug/clipboard-tools qualify-native-client
       - name: Prepare the real GJS runtime
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install --no-install-recommends -y gjs

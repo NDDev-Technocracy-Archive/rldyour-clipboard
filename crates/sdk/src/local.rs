@@ -1,5 +1,5 @@
 use crate::policy::Policy;
-use crate::{Client, Error};
+use crate::{Client, Error, Subscription};
 use async_io::Async;
 use nddev_clipboard_api::wire::Role;
 use socket2::{Domain, SockAddr, Socket, Type};
@@ -46,6 +46,18 @@ impl LocalOperation {
     }
 
     pub fn connect(self, path: &Path, role: Role) -> Result<Client<LocalTransport>, Error> {
+        let stream = self.transport(path)?;
+        let policy = stream.policy.clone();
+        Client::with_policy(stream, role, Some(policy))
+    }
+
+    pub fn subscribe(self, path: &Path) -> Result<Subscription<LocalTransport>, Error> {
+        let stream = self.transport(path)?;
+        let policy = stream.policy.clone();
+        Subscription::with_policy(stream, Some(policy))
+    }
+
+    fn transport(self, path: &Path) -> Result<LocalTransport, Error> {
         self.policy.remaining().map_err(transport_error)?;
         let address = SockAddr::unix(path).map_err(transport_error)?;
         let socket = Socket::new(Domain::UNIX, Type::STREAM, None).map_err(transport_error)?;
@@ -55,12 +67,10 @@ impl LocalOperation {
         result.map_err(transport_error)?;
         let socket = Arc::new(Async::new(socket).map_err(transport_error)?);
         self.policy.register(&socket).map_err(transport_error)?;
-        let stream = LocalTransport {
+        Ok(LocalTransport {
             socket,
             policy: self.policy,
-        };
-        let policy = stream.policy.clone();
-        Client::with_policy(stream, role, Some(policy))
+        })
     }
 }
 

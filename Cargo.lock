@@ -472,6 +472,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "nddev-clipboard"
+version = "0.2.2"
+dependencies = [
+ "nddev-clipboard-api",
+ "nddev-clipboard-sdk",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "nddev-clipboard-api"
 version = "0.2.2"
 dependencies = [

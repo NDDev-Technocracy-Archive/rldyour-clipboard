@@ -16,6 +16,7 @@ wire format, immutable published releases and existing archive/installation iden
 - `crates/api`: typed configuration, wire protocol, content rules and desktop presentation types.
 - `crates/sdk`: streaming client with an owned-transport API and a bounded native pathname connector;
   no archive access or collector.
+- `crates/cli`: the native `nddev-clipboard` command using that SDK and the same profile.
 - `crates/platform`: only the native operations approved in ADR 0001, behind safe interfaces.
 - `crates/files`: bounded TAR file selections under ADR 0003; no archive or native clipboard owner.
 - `daemon`: native capture, serving, private filesystem operations, store and maintenance.
@@ -39,6 +40,10 @@ Windows native capture acceptance requires an explicitly isolated CI desktop and
 `just test-platform-client` builds this source and exercises the retained GJS or Swift socket
 client on Linux/macOS. It uses a private complete profile with native capture disabled; it does
 not select an installed daemon. This qualifies client RPC, not a live GNOME Shell or native menu.
+`just test-native-client` qualifies the real Rust CLI and daemon selected from Cargo artifact
+messages on all native targets. It uses a private profile with capture disabled and synthetic
+large content. Watch emits its validated greeting before notifications and owns a finite lifetime.
+Its provider deadline cannot interrupt an arbitrary consumer blocking its standard output.
 The retained-release file fixture restores through `private-fs` capabilities and reopens the
 private destination before reading its bytes. That test-only dependency qualifies destination
 creation on each native target; it does not migrate archive permissions or select native file

@@ -1,5 +1,5 @@
 [workspace]
-members = ["daemon", "crates/api", "crates/sdk", "crates/platform", "crates/files", "tools/clipboard-tools"]
+members = ["daemon", "crates/api", "crates/sdk", "crates/cli", "crates/platform", "crates/files", "tools/clipboard-tools"]
 resolver = "3"
 
 [workspace.package]
