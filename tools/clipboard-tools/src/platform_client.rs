@@ -33,7 +33,7 @@ pub(crate) fn qualify(root: &Path) -> Result<()> {
     })?;
     let profile = directory.path().join("clipboard.toml");
     std::fs::write(&profile, config.to_toml()?)?;
-    let mut command = Command::new(&daemon);
+    let mut command = Command::new(daemon);
     command.arg("--config").arg(&profile).stdout(Stdio::null());
     for key in ["LISTEN_FDS", "LISTEN_PID", "LISTEN_FDNAMES"] {
         command.env_remove(key);
@@ -47,7 +47,7 @@ pub(crate) fn qualify(root: &Path) -> Result<()> {
             .arg("-m")
             .arg(root.join("extension/tests/client.js"))
             .arg(&profile)
-            .arg(&daemon)
+            .arg(daemon)
             .arg(retention_days.to_string());
         OwnedProcess::start(&mut command)?.finish(deadline)?;
     } else {
@@ -82,7 +82,7 @@ pub(crate) fn qualify(root: &Path) -> Result<()> {
         let mut command = Command::new(&executable);
         command
             .arg(&profile)
-            .arg(&daemon)
+            .arg(daemon)
             .arg(retention_days.to_string());
         OwnedProcess::start(&mut command)?.finish(deadline)?;
     }
