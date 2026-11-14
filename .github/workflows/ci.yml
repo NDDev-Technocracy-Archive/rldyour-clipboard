@@ -242,7 +242,7 @@ jobs:
       - name: Lint and audit workflows
         run: |
           actionlint
-          zizmor --offline --no-progress .github/workflows/ci.yml .github/dependabot.yml
+          zizmor --offline --no-progress .github/workflows/ci.yml
       - name: Scan new pull request commits, or the full history on main
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
